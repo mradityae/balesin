@@ -1,0 +1,211 @@
+mongosh -u wa_user -p password123 --authenticationDatabase wa_saas
+
+db.users.updateOne(
+  { email: "test@gmail.com" },
+  {
+    $set: {
+      subscribedUntil: new Date("2020-01-01T00:00:00.000Z")
+    }
+  }
+);
+
+
+import TelegramBot from "node-telegram-bot-api";
+import fetch from "node-fetch";
+import dotenv from "dotenv";
+import FormData from "form-data";
+
+dotenv.config();
+
+// === 🔧 KONFIGURASI ===
+const TELE_TOKEN =
+  process.env.TELE_TOKEN || "8433577191:AAEF6rb7KQ4ecsA2tB5tjwyrRdltMpZ6J1g";
+const GEMINI_API_KEY =
+  process.env.GEMINI_API_KEY || "AIzaSyC-CRvw4twzAm-3ThrX9HzwrKUaT-wWu2g";
+const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_API_UPLOAD = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_API_KEY}`;
+const GEMINI_API_GENERATE = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+const bot = new TelegramBot(TELE_TOKEN, { polling: true });
+console.log("🤖 Bot Gemini serbaguna (pakai File API, versi cepat & Bahasa Indonesia) aktif...");
+
+// === 🔹 Ketik terus sampai berhenti ===
+const typingIntervals = new Map();
+
+function keepTyping(chatId) {
+  stopTyping(chatId); // pastikan gak dobel
+  const interval = setInterval(() => {
+    bot.sendChatAction(chatId, "typing").catch(() => {});
+  }, 4000);
+  typingIntervals.set(chatId, interval);
+}
+
+function stopTyping(chatId) {
+  const interval = typingIntervals.get(chatId);
+  if (interval) clearInterval(interval);
+  typingIntervals.delete(chatId);
+}
+
+// === 🔹 Upload File ke Gemini ===
+async function uploadToGemini(tgUrl, fileName = "file_upload") {
+  const res = await fetch(tgUrl);
+  const buffer = await res.arrayBuffer();
+
+  const form = new FormData();
+  form.append("file", Buffer.from(buffer), fileName);
+
+  console.log("📤 Upload file ke Gemini...");
+  const upload = await fetch(GEMINI_API_UPLOAD, { method: "POST", body: form });
+  const data = await upload.json();
+
+  if (!upload.ok) {
+    console.error("❌ Gagal upload ke Gemini:", data);
+    throw new Error("Upload gagal ke Gemini File API");
+  }
+
+  console.log("✅ File berhasil diupload:", data.file?.name);
+  return data.file;
+}
+
+// === 🔹 Kirim Prompt + File ke Gemini ===
+async function askGemini(prompt, fileObj = null) {
+  const fullPrompt = `
+Kamu adalah asisten AI profesional yang **selalu menjawab dalam Bahasa Indonesia**.
+Gunakan bahasa yang sopan, mudah dimengerti, dan terstruktur rapi.
+Berikan penjelasan yang informatif dan jangan gunakan bahasa Inggris kecuali diminta.
+
+Pertanyaan / konteks pengguna:
+${prompt}
+  `.trim();
+
+  const body = {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: fullPrompt }],
+      },
+    ],
+  };
+
+  if (fileObj?.uri) {
+    body.contents[0].parts.push({
+      fileData: {
+        mimeType: fileObj.mimeType || "application/octet-stream",
+        fileUri: fileObj.uri,
+      },
+    });
+  }
+
+  const res = await fetch(GEMINI_API_GENERATE, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    console.error("❌ Error dari Gemini:", data);
+    throw new Error("Gagal generate response");
+  }
+
+  return (
+    data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+    "⚙️ Maaf, aku belum bisa mengenali isi yang kamu kirim."
+  );
+}
+
+// === 🔹 Potong teks panjang agar tidak error Telegram ===
+function splitMessage(text, limit = 4000) {
+  const chunks = [];
+  for (let i = 0; i < text.length; i += limit) {
+    chunks.push(text.substring(i, i + limit));
+  }
+  return chunks;
+}
+
+// === 🔹 Ambil File URL dari Telegram ===
+async function getFileUrl(fileId) {
+  const file = await bot.getFile(fileId);
+  return `https://api.telegram.org/file/bot${TELE_TOKEN}/${file.file_path}`;
+}
+
+// === ⚙️ EVENT UTAMA ===
+bot.on("message", async (msg) => {
+  console.log("msg :", msg);
+  const chatId = msg.chat.id;
+  const caption = msg.caption?.trim() || msg.text?.trim() || "";
+
+  try {
+    keepTyping(chatId); // mulai indikator cepat
+
+    // === 1️⃣ FOTO ===
+    if (msg.photo) {
+      const fileId = msg.photo[msg.photo.length - 1].file_id;
+      const tgUrl = await getFileUrl(fileId);
+
+      const fileObj = await uploadToGemini(tgUrl, "photo.jpg");
+      const reply = await askGemini(
+        caption || "Tolong analisis gambar ini dengan detail dan jelaskan dalam bahasa Indonesia.",
+        fileObj
+      );
+
+      stopTyping(chatId);
+      for (const chunk of splitMessage(reply)) await bot.sendMessage(chatId, chunk);
+      return;
+    }
+
+    // === 2️⃣ DOKUMEN ===
+    if (msg.document) {
+      const { file_id, file_name, mime_type } = msg.document;
+      const tgUrl = await getFileUrl(file_id);
+
+      const fileObj = await uploadToGemini(tgUrl, file_name);
+      fileObj.mimeType = mime_type;
+      const reply = await askGemini(
+        caption || `Analisis isi file ${file_name} secara ringkas dan jelaskan dalam bahasa Indonesia.`,
+        fileObj
+      );
+
+      stopTyping(chatId);
+      for (const chunk of splitMessage(reply)) await bot.sendMessage(chatId, chunk);
+      return;
+    }
+
+    // === 3️⃣ AUDIO / VOICE ===
+    if (msg.voice || msg.audio) {
+      const fileId = msg.voice?.file_id || msg.audio?.file_id;
+      const tgUrl = await getFileUrl(fileId);
+
+      const fileObj = await uploadToGemini(tgUrl, "audio.mp3");
+      const reply = await askGemini(
+        caption || "Tolong jelaskan isi dari audio ini dalam bahasa Indonesia.",
+        fileObj
+      );
+
+      stopTyping(chatId);
+      for (const chunk of splitMessage(reply)) await bot.sendMessage(chatId, chunk);
+      return;
+    }
+
+    // === 4️⃣ TEKS BIASA ===
+    if (caption) {
+      const reply = await askGemini(caption);
+      stopTyping(chatId);
+      for (const chunk of splitMessage(reply)) await bot.sendMessage(chatId, chunk);
+      return;
+    }
+
+    stopTyping(chatId);
+    return bot.sendMessage(chatId, "⚙️ Maaf, aku belum bisa memproses format file ini.");
+  } catch (err) {
+    stopTyping(chatId);
+    console.error("🚨 Error utama:", err);
+    return bot.sendMessage(
+      chatId,
+      "❌ Terjadi kesalahan saat memproses file. Coba lagi nanti."
+    );
+  }
+});
+
+curl -X POST "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent" -H "Content-Type: application/json" -H "X-goog-api-key: AIzaSyA-y4et8zCfDx65Jd5y19a13X6IbgoBW0w" -d "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Explain how AI works in a few words\"}]}]}"
