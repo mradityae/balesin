@@ -1,16 +1,21 @@
-import React from "react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Card from "../components/Card";
 import TopBar from "../components/TopBar";
+import Swal from "sweetalert2";
 
 export default function Dashboard() {
   const [bot, setBot] = useState(null);
-  const [business, setBusiness] = useState(undefined); // undefined = loading
+  const [business, setBusiness] = useState(undefined);
   const [loading, setLoading] = useState(false);
+  const [qrLoading, setQrLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [wasConnected, setWasConnected] = useState(false);
+
+  const qrRef = useRef(null);
+  const topRef = useRef(null);
   const nav = useNavigate();
 
   const load = async () => {
@@ -21,73 +26,118 @@ export default function Dashboard() {
       ]);
 
       setBot(botRes.data);
-      setBusiness(bizRes.data); // null kalau belum ada
+      setBusiness(bizRes.data);
       setError(null);
+
+      if (botRes.data?.qr) {
+        setQrLoading(false);
+      }
+
     } catch (err) {
       const msg = err.response?.data?.error;
-      setError(
-        msg === "No subscription"
-          ? "No subscription"
-          : "Gagal memuat dashboard"
-      );
+
+      if (msg === "No subscription") {
+        Swal.fire({
+          icon: "warning",
+          title: "Akun belum aktif",
+          text: "Silakan hubungi admin.",
+        });
+        setError(null);
+        return;
+      }
+
+      setError("Gagal memuat dashboard");
     }
   };
 
-  const startBot = async () => {
+  // MASTER start & restart function
+  const startBot = async (isRestart = false) => {
     try {
+
       setLoading(true);
+
+      if (!isRestart) {
+        setQrLoading(true);
+        setBot(b => (b ? { ...b, qr: null } : null));
+      }
+
       await api.post("/bot/start");
       await load();
+
+      if (!isRestart) {
+        setTimeout(() => {
+          qrRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 200);
+      }
+
     } catch (err) {
+
       const msg = err.response?.data?.error;
-      setError(
-        msg === "No subscription"
-          ? "No subscription"
-          : "Gagal menjalankan bot"
-      );
+
+      if (msg === "No subscription") {
+        Swal.fire({
+          icon: "warning",
+          title: "Akun belum aktif",
+          text: "Silakan hubungi admin.",
+        });
+        setQrLoading(false);
+        setLoading(false);
+        return;
+      }
+
+      setError(isRestart ? "Gagal restart bot" : "Gagal menjalankan bot");
+
     } finally {
+
       setLoading(false);
+
+      // restart mode → tidak paksa qr keluar
+      if (isRestart) {
+        setQrLoading(false);
+      }
     }
   };
+
 
   useEffect(() => {
     load();
+
     if (!bot?.connected) {
       const t = setInterval(load, 3000);
       return () => clearInterval(t);
     }
+
   }, [bot?.connected]);
 
+
+  useEffect(() => {
+    if (bot?.connected && !wasConnected) {
+      setWasConnected(true);
+
+      setTimeout(() => {
+        topRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 200);
+
+      setQrLoading(false);
+    }
+
+    if (!bot?.connected) {
+      setWasConnected(false);
+    }
+  }, [bot?.connected]);
+
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 md:p-10">
+    <div
+      ref={topRef}
+      className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 md:p-10"
+    >
       <TopBar
         title="WhatsApp Bot Dashboard"
         subtitle="Kelola koneksi WhatsApp bot kamu di sini"
         variant="user"
       />
 
-      {/* ERROR */}
-      {error && (
-        <div className="max-w-6xl mx-auto mb-6">
-          <div className="flex gap-3 bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-xl text-sm">
-            ⚠️
-            <div>
-              {error === "No subscription" ? (
-                <>
-                  <p className="font-semibold">Akun belum aktif</p>
-                  <p className="text-xs mt-1">
-                    Silakan hubungi admin untuk mengaktifkan subscription.
-                  </p>
-                </>
-              ) : (
-                error
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* BUSINESS NOT SET */}
       {business === null && (
         <div className="max-w-6xl mx-auto mb-6">
           <div className="flex items-center justify-between bg-yellow-50 border border-yellow-200 px-5 py-4 rounded-xl">
@@ -111,7 +161,7 @@ export default function Dashboard() {
       )}
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* STATUS BOT */}
+
         <Card title="Status Bot">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -127,51 +177,40 @@ export default function Dashboard() {
               </span>
             </div>
 
-            {!bot?.connected ? (
-              <button
-                onClick={startBot}
-                disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-6 py-2 rounded-xl shadow disabled:opacity-60"
-              >
-                {loading ? "Connecting..." : "Connect WhatsApp"}
-              </button>
-            ) : (
-              <button
-                onClick={startBot}
-                disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-6 py-2 rounded-xl shadow disabled:opacity-60"
-              >
-                {loading ? "Restarting..." : "Restart Connection"}
-              </button>
-            )}
+            <button
+              onClick={() => {
+                if (bot?.connected) startBot(true);
+                else startBot(false);
+              }}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-6 py-2 rounded-xl shadow disabled:opacity-60"
+            >
+              {loading
+                ? "Working..."
+                : bot?.connected
+                ? "Restart"
+                : "Connect WhatsApp"}
+            </button>
           </div>
-
-          {bot?.connected && (
-            <p className="text-xs text-slate-500 mt-4">
-              Bot terhubung ke WhatsApp.
-            </p>
-          )}
         </Card>
 
-        {/* BUSINESS SUMMARY */}
         {business && (
           <Card title="Profil Bisnis">
             <div className="space-y-2 text-sm text-slate-700">
               <p>
                 <b>Nama:</b> {business.name}
               </p>
-              <p>
-                <b>Deskripsi:</b> {business.description}
-              </p>
-              <p>
-                <b>Gaya Bicara:</b> {business.tone}
-              </p>
-              <p>
-                <b>Produk:</b> {business.products?.length || 0}
-              </p>
-              <p>
-                <b>FAQ:</b> {business.faq?.length || 0}
-              </p>
+
+              <div className="flex flex-col">
+                <b>Deskripsi:</b>
+                <div className="max-h-40 overflow-y-auto pr-1 whitespace-pre-line text-sm text-slate-700 text-justify leading-relaxed">
+                  {business.description}
+                </div>
+              </div>
+
+              <p><b>Gaya Bicara:</b> {business.tone}</p>
+              <p><b>Produk:</b> {business.products?.length || 0}</p>
+              <p><b>FAQ:</b> {business.faq?.length || 0}</p>
 
               <button
                 onClick={() => nav("/setup-business")}
@@ -183,19 +222,33 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* QR */}
-        {bot?.qr && (
-          <Card title="Scan QR Code">
-            <div className="flex flex-col items-center">
+        <Card title="Scan QR Code">
+          <div
+            ref={qrRef}
+            className="flex flex-col items-center justify-center min-h-[300px]"
+          >
+
+            {qrLoading && !bot?.qr && !bot?.connected && (
+              <div className="flex flex-col items-center justify-center">
+                <div className="w-14 h-14 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+                <p className="text-xs text-slate-500 mt-3">
+                  Menyiapkan QR...
+                </p>
+              </div>
+            )}
+
+            {bot?.qr && !bot?.connected && (
               <div className="bg-white p-4 rounded-2xl shadow">
                 <img src={bot.qr} alt="QR" className="w-56 h-56" />
               </div>
-              <p className="text-xs text-slate-500 text-center mt-4">
-                WhatsApp → Linked Devices → Scan QR
-              </p>
-            </div>
-          </Card>
-        )}
+            )}
+
+            <p className="text-xs text-slate-500 text-center mt-4">
+              WhatsApp → Linked Devices → Scan QR
+            </p>
+          </div>
+        </Card>
+
       </div>
     </div>
   );

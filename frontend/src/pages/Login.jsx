@@ -1,5 +1,4 @@
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
 import api from "../services/api";
 import { setToken } from "../utils/auth";
 import { useNavigate, Link } from "react-router-dom";
@@ -14,10 +13,7 @@ export default function Login() {
 
   const submit = async () => {
     if (!email || !password) {
-      Swal.fire({
-        icon: "warning",
-        text: "Email dan password wajib diisi",
-      });
+      Swal.fire({ icon: "warning", text: "Email dan password wajib diisi" });
       return;
     }
 
@@ -29,7 +25,7 @@ export default function Login() {
 
       setToken(token);
 
-      const payload = jwtDecode(token);
+      const payload = jwtDecode(token); // Baca role dari token
 
       Swal.fire({
         icon: "success",
@@ -42,70 +38,72 @@ export default function Login() {
         if (payload.role === "admin") {
           nav("/admin");
         } else {
-          nav("/");
+          nav("/dashboard");
         }
       }, 1000);
+
     } catch (err) {
-      // ❌ unauthorized
-      if (err.response?.status === 401) {
-        Swal.fire({
-          icon: "error",
-          text: "Email atau password salah",
-        });
-        return;
-      }
-
-      // ❌ fallback error
-      const msg =
-        err.response?.data?.error ||
-        err.response?.data?.message ||
-        "Terjadi kesalahan, silakan coba lagi";
-
       Swal.fire({
         icon: "error",
-        text: msg,
+        text: "Email atau password salah",
       });
     } finally {
       setLoading(false);
     }
   };
 
+
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-full max-w-md bg-white p-8 rounded-xl shadow">
-        <h1 className="text-2xl font-bold mb-6 text-center">
-          Login Dashboard
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-100 px-4">
+
+      <div className="bg-white border border-gray-200 rounded-xl shadow-lg p-8 w-full max-w-md relative">
+
+        <Link
+          to="/"
+          className="
+            absolute -top-3 left-4
+            bg-white px-3 py-1.5 rounded-full border
+            text-xs font-medium text-slate-600
+            hover:text-blue-600 transition
+          "
+        >
+          ← Landing
+        </Link>
+
+        <h1 className="text-center text-gray-900 font-extrabold text-3xl mb-2 mt-4">
+          Login
         </h1>
 
         <input
-          className="w-full border rounded-lg px-4 py-2 mb-4"
+          className="w-full border px-4 py-3 mb-4 rounded-lg"
           placeholder="Email"
           value={email}
-          onChange={e => setEmail(e.target.value)}
+          onChange={(e) => setEmail(e.target.value)}
         />
 
         <input
-          className="w-full border rounded-lg px-4 py-2 mb-6"
+          className="w-full border px-4 py-3 mb-6 rounded-lg"
           type="password"
           placeholder="Password"
           value={password}
-          onChange={e => setPassword(e.target.value)}
+          onChange={(e) => setPassword(e.target.value)}
         />
 
         <button
           onClick={submit}
           disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg disabled:opacity-60"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold"
         >
-          {loading ? "Logging in..." : "Login"}
+          {loading ? "Memproses..." : "Login"}
         </button>
 
-        <p className="text-sm text-center mt-4">
+        <p className="text-center text-gray-500 text-sm mt-6">
           Belum punya akun?{" "}
-          <Link to="/register" className="text-blue-600 font-medium">
+          <Link to="/register" className="text-blue-600 font-medium hover:underline">
             Register
           </Link>
         </p>
+
       </div>
     </div>
   );

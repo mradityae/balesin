@@ -1,5 +1,4 @@
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
 import api from "../services/api";
 import { useNavigate, Link } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -12,11 +11,7 @@ export default function Register() {
 
   const submit = async () => {
     if (!email || !password) {
-      Swal.fire({
-        icon: "warning",
-        title: "Oops",
-        text: "Email dan password wajib diisi",
-      });
+      Swal.fire({ icon: "warning", text: "Email dan password wajib diisi" });
       return;
     }
 
@@ -27,21 +22,17 @@ export default function Register() {
 
       Swal.fire({
         icon: "success",
-        title: "Berhasil",
-        text: "Registrasi berhasil, silakan login",
+        text: "Registrasi berhasil!",
         timer: 1500,
-        showConfirmButton: true,
+        showConfirmButton: false,
       });
 
       setTimeout(() => nav("/login"), 1500);
-    } catch (err) {
-      const msg =
-        err.response?.data?.error || "Registrasi gagal, coba lagi";
 
+    } catch (err) {
       Swal.fire({
         icon: "error",
-        title: "Register gagal",
-        text: msg,
+        text: "Registrasi gagal",
       });
     } finally {
       setLoading(false);
@@ -49,49 +40,55 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white border rounded-xl p-8">
-        {/* Header */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold">Register</h2>
-          <p className="text-sm text-gray-500">
-            Buat akun untuk mulai menggunakan WhatsApp Bot
-          </p>
-        </div>
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-100 px-4">
 
-        {/* Form */}
-        <div className="space-y-4">
-          <input
-            className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-          />
+      <div className="bg-white border rounded-xl shadow-lg p-8 w-full max-w-md relative">
 
-          <input
-            type="password"
-            className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-          />
+        <Link
+          to="/"
+          className="
+            absolute -top-3 left-4
+            bg-white px-3 py-1.5 rounded-full border
+            text-xs font-medium text-slate-600
+            hover:text-blue-600 transition
+          "
+        >
+          ← Landing
+        </Link>
 
-          <button
-            onClick={submit}
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg disabled:opacity-60"
-          >
-            {loading ? "Registering..." : "Register"}
-          </button>
-        </div>
+        <h1 className="text-center text-gray-900 font-extrabold text-3xl mb-2 mt-4">
+          Register
+        </h1>
 
-        {/* Footer */}
-        <p className="text-sm text-center text-gray-500 mt-6">
+        <input
+          className="w-full border px-4 py-3 mb-4 rounded-lg"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+
+        <input
+          className="w-full border px-4 py-3 mb-6 rounded-lg"
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
+        <button
+          onClick={submit}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg"
+        >
+          Register
+        </button>
+
+        <p className="text-center text-gray-500 text-sm mt-6">
           Sudah punya akun?{" "}
-          <Link to="/login" className="text-blue-600 font-medium">
+          <Link to="/login" className="text-blue-600 font-medium hover:underline">
             Login
           </Link>
         </p>
+
       </div>
     </div>
   );

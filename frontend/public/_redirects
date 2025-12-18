@@ -1,1 +1,5 @@
-/*    /index.html   200
+# API PROXY (PALING ATAS)
+ /api/*  http://103.172.205.71:5000/api/:splat  200!
+
+# SPA FALLBACK (PALING BAWAH)
+ /*      /index.html                            200
