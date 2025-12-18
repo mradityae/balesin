@@ -13,8 +13,6 @@ module.exports = () => {
       subscribedUntil: { $lt: now },
     });
 
-    console.log("expiredUsers : ",expiredUsers);
-
     for (const user of expiredUsers) {
       try {
         await resetSessionByUserId(user._id.toString());

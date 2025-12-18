@@ -3,45 +3,127 @@ const {
   useMultiFileAuthState,
   DisconnectReason
 } = require("@whiskeysockets/baileys");
+
 const qrcode = require("qrcode");
 const { getSessionPath } = require("./sessionManager");
 const Bot = require("../models/Bot");
-const handleMessage = require("./messageHandler");
 
-module.exports = async function createBot(user) {
-  const sessionPath = getSessionPath(user._id);
-  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+let SOCKETS = {};
+let HEARTBEAT = {};
 
-  const sock = makeWASocket({
-    auth: state,
-    printQRInTerminal: false,
-    syncFullHistory: false
+function wait(ms) {
+  return new Promise(res => setTimeout(res, ms));
+}
+
+const Queue = {};
+const Active = {};
+
+async function pushQueue(uid, fn) {
+  if (!Queue[uid]) Queue[uid] = [];
+  Queue[uid].push(fn);
+  run(uid);
+}
+
+async function run(uid) {
+  if (Active[uid]) return;
+  Active[uid] = true;
+
+  while (Queue[uid]?.length) {
+    const job = Queue[uid].shift();
+    try { await job(); } catch {}
+    await wait(1500 + Math.random() * 2000);
+  }
+
+  Active[uid] = false;
+}
+
+function mutate(text) {
+  const endings = ["", " 😊", " ✨", " 🙌", " 👍"];
+  return text + endings[Math.floor(Math.random() * endings.length)];
+}
+
+async function humanSend(sock, uid, jid, text) {
+
+  await sock.sendPresenceUpdate("composing", jid);
+  await wait(1000 + Math.random() * 2000);
+
+  await pushQueue(uid, async () => {
+    await sock.sendMessage(jid, { text });
   });
 
-  let reconnecting = false; // ⛔ anti loop
+  await sock.sendPresenceUpdate("paused", jid);
+}
 
-  /* =====================
-     CONNECTION UPDATE
-     ===================== */
-  sock.ev.on("connection.update", async (update) => {
-    const { connection, qr, lastDisconnect } = update;
+async function bulkSend(sock, uid, jids, text) {
+  let processed = 0;
 
-    // QR
+  for (const jid of jids) {
+    await humanSend(sock, uid, jid, mutate(text));
+    processed++;
+
+    if (processed % 150 === 0) {
+      await wait(60000);
+    }
+  }
+}
+
+async function createBot(user) {
+
+  const uid = user._id.toString();
+
+  async function recreate(reason) {
+
+    console.log("RESTART:", uid, reason);
+
+    try {
+      if (SOCKETS[uid]) {
+        try { SOCKETS[uid].ws.close(); } catch {}
+        try { SOCKETS[uid].end(); } catch {}
+      }
+    } catch {}
+
+    await wait(1500);
+    return createBot(user);
+  }
+
+  if (SOCKETS[uid]) {
+    try { SOCKETS[uid].ws.close(); } catch {}
+    try { SOCKETS[uid].end(); } catch {}
+    await wait(800);
+  }
+
+  const { state, saveCreds } = await useMultiFileAuthState(
+    getSessionPath(uid)
+  );
+
+  const sock = SOCKETS[uid] = makeWASocket({
+    auth: state,
+    keepAliveIntervalMs: 10000,
+    syncFullHistory: false,
+    printQRInTerminal: false
+  });
+
+  HEARTBEAT[uid] = Date.now();
+
+  sock.ev.on("creds.update", saveCreds);
+
+  sock.ev.on("connection.update", async (up) => {
+
+    const { connection, qr, lastDisconnect } = up;
+
     if (qr) {
-      const dataUrl = await qrcode.toDataURL(qr);
+      const img = await qrcode.toDataURL(qr);
       await Bot.findOneAndUpdate(
-        { uid: user._id },
-        { qr: dataUrl, connected: false },
+        { uid },
+        { qr: img, connected: false },
         { upsert: true }
       );
     }
 
-    // CONNECTED
     if (connection === "open") {
-      reconnecting = false;
 
       await Bot.findOneAndUpdate(
-        { uid: user._id },
+        { uid },
         {
           connected: true,
           qr: null,
@@ -49,58 +131,66 @@ module.exports = async function createBot(user) {
         }
       );
 
-      console.log("✅ WA connected:", user._id);
+      HEARTBEAT[uid] = Date.now();
+      console.log("ONLINE:", uid);
     }
 
-    // DISCONNECTED
     if (connection === "close") {
-      const code = lastDisconnect?.error?.output?.statusCode;
 
-      // LOGOUT → stop total (butuh QR ulang)
+      const code =
+        lastDisconnect?.error?.output?.statusCode ||
+        lastDisconnect?.error?.statusCode;
+
       if (code === DisconnectReason.loggedOut) {
+
         await Bot.findOneAndUpdate(
-          { uid: user._id },
+          { uid },
           { connected: false, qr: null }
         );
-        console.log("🧼 Logged out, need QR");
-        return;
+
+        return recreate("logout");
       }
 
-      // 🔁 auto reconnect 1x (AMAN untuk pairing)
-      if (!reconnecting) {
-        reconnecting = true;
-        console.log("🔄 Reconnecting once...");
-        setTimeout(() => createBot(user), 1500);
-      }
+      return recreate("connection closed");
     }
   });
 
-  /* =====================
-     SAVE CREDS (SAFE)
-     ===================== */
-  sock.ev.on("creds.update", async () => {
-  try {
-    await saveCreds();
-  } catch (e) {
-    if (e.code === "ENOENT") {
-      console.warn("⚠️ creds.json missing, save skipped");
-      return;
-    }
-    throw e;
-  }
-});
+  sock.ws.on("error", () => recreate("ws error"));
+  sock.ws.on("close", () => recreate("ws close"));
 
-  /* =====================
-     MESSAGE HANDLER
-     ===================== */
-  sock.ev.on("messages.upsert", async (m) => {
-    try {
-      await handleMessage(sock, user, m);
-    } catch (e) {
-      if (e?.name === "SessionError") return; // crypto reset → ignore
-      throw e;
+  setInterval(() => {
+
+    const last = HEARTBEAT[uid];
+    if (!last) return;
+
+    if (Date.now() - last > 60000) {
+      return recreate("heartbeat dead");
     }
+
+  }, 12000);
+
+  sock.ev.on("messages.upsert", async (m) => {
+
+    try {
+
+      HEARTBEAT[uid] = Date.now();
+
+      const handleMessage = require("./messageHandler");
+
+      await handleMessage(sock, user, m, {
+        humanSend: (jid, text) => humanSend(sock, uid, jid, text),
+        bulkSend: (jids, text) => bulkSend(sock, uid, jids, text),
+        rawSend: fn => pushQueue(uid, fn),
+        mutate
+      });
+
+    } catch (e) {
+      console.log("MSG ERROR:", e.message);
+    }
+
   });
 
   return sock;
-};
+}
+
+module.exports = createBot;
