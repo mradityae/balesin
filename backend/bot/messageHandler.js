@@ -1,6 +1,11 @@
 const MCP = require("../mcp");
 const Business = require("../models/BusinessProfile");
 
+// Random helper
+function randomDelay(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 module.exports = async function handleMessage(sock, user, m) {
   const msg = m.messages?.[0];
   if (!msg || msg.key.fromMe) return;
@@ -25,19 +30,56 @@ module.exports = async function handleMessage(sock, user, m) {
 
   try {
 
-    // <<< ━━━━━━━ ADD HERE ━━━━━━━
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━
+       TYPING BEFORE MCP
+    ━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+    let typing = true;
+
+    // start composing
     await sock.sendPresenceUpdate("composing", jid);
 
-    const reply = await MCP(user._id, text);
+    // random typing loop
+    const typingLoop = async () => {
+      while (typing) {
+        await sock.sendPresenceUpdate("composing", jid);
+        await new Promise(r => setTimeout(r, randomDelay(800, 2500)));
+      }
+    };
 
+    typingLoop(); // run without await
+
+
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━
+       AI RESPONSE
+    ━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+    const reply = await MCP(user._id, text); // MCP bisa lama → typing tetap jalan
+
+
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━
+       STOP TYPING
+    ━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+    typing = false;
     await sock.sendPresenceUpdate("paused", jid);
-    // <<< ━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━
+       SEND MESSAGE
+    ━━━━━━━━━━━━━━━━━━━━━━━━ */
 
     await sock.sendMessage(jid, { text: reply });
 
   } catch (e) {
-    console.error("AI error:", e.message);
+
+    typing = false;
     await sock.sendPresenceUpdate("paused", jid);
+
+    console.log("AI error:", e.message);
     await sock.sendMessage(jid, {
       text: "Maaf, terjadi kesalahan. Silakan coba lagi nanti.",
     });
