@@ -1,12 +1,20 @@
 const MCP = require("../mcp");
 const Business = require("../models/BusinessProfile");
 
-// Random helper
-function randomDelay(min, max) {
+// helper
+function delay(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function random(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+// store typing state per user chat
+const typingState = new Map();
+
 module.exports = async function handleMessage(sock, user, m) {
+
   const msg = m.messages?.[0];
   if (!msg || msg.key.fromMe) return;
 
@@ -28,60 +36,74 @@ module.exports = async function handleMessage(sock, user, m) {
     return;
   }
 
-  try {
 
-    /* ━━━━━━━━━━━━━━━━━━━━━━━━
-       TYPING BEFORE MCP
-    ━━━━━━━━━━━━━━━━━━━━━━━━ */
+  /* =====================================================
+      TYPING SYSTEM: MAX 20 SECONDS AND SAFE ABORT
+  ===================================================== */
+  
+  // if bot already typing → skip typing animation for this message
+  if (!typingState.get(jid)) {
 
-    let typing = true;
+    typingState.set(jid, true);
 
-    // start composing
-    await sock.sendPresenceUpdate("composing", jid);
+    (async () => {
 
-    // random typing loop
-    const typingLoop = async () => {
-      while (typing) {
-        await sock.sendPresenceUpdate("composing", jid);
-        await new Promise(r => setTimeout(r, randomDelay(800, 2500)));
+      // max 12 loops × 2500ms ≈ 30s total max
+      for (let i = 0; i < 12; i++) {
+
+        // already stopped by reply
+        if (!typingState.get(jid)) break;
+
+        try {
+          await sock.sendPresenceUpdate("composing", jid);
+        } catch {}
+
+        await delay(random(800, 2500));
       }
-    };
 
-    typingLoop(); // run without await
+      // safety stop
+      await sock.sendPresenceUpdate("paused", jid);
+
+    })();
+  }
 
 
-
-    /* ━━━━━━━━━━━━━━━━━━━━━━━━
+  /* =====================================================
        AI RESPONSE
-    ━━━━━━━━━━━━━━━━━━━━━━━━ */
+  ===================================================== */
 
-    const reply = await MCP(user._id, text); // MCP bisa lama → typing tetap jalan
+  let reply;
+  try {
+    reply = await MCP(user._id, text);
 
-
-
-    /* ━━━━━━━━━━━━━━━━━━━━━━━━
-       STOP TYPING
-    ━━━━━━━━━━━━━━━━━━━━━━━━ */
-
-    typing = false;
+  } catch (err) {
+    await delay(random(1500, 4000));
+    typingState.set(jid, false);
     await sock.sendPresenceUpdate("paused", jid);
 
+    console.log("AI error:", err.message);
 
-
-    /* ━━━━━━━━━━━━━━━━━━━━━━━━
-       SEND MESSAGE
-    ━━━━━━━━━━━━━━━━━━━━━━━━ */
-
-    await sock.sendMessage(jid, { text: reply });
-
-  } catch (e) {
-
-    typing = false;
-    await sock.sendPresenceUpdate("paused", jid);
-
-    console.log("AI error:", e.message);
     await sock.sendMessage(jid, {
       text: "Maaf, terjadi kesalahan. Silakan coba lagi nanti.",
     });
+
+    return;
   }
+
+  
+  /* =====================================================
+      SEND MESSAGE TO USER
+  ===================================================== */
+
+  await delay(random(1500, 4000));
+  typingState.set(jid, false);
+
+  await sock.sendPresenceUpdate("paused", jid);
+
+  try {
+    await sock.sendMessage(jid, { text: reply });
+  } catch (err) {
+    console.log("send error:", err.message);
+  }
+
 };

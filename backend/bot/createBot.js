@@ -9,24 +9,31 @@ const Bot = require("../models/Bot");
 const handleMessage = require("./messageHandler");
 
 module.exports = async function createBot(user) {
+
   const sessionPath = getSessionPath(user._id);
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
   const sock = makeWASocket({
     auth: state,
     printQRInTerminal: false,
-    syncFullHistory: false
+    syncFullHistory: false,
+    markOnlineOnConnect: true
   });
 
-  let reconnecting = false; // ⛔ anti loop
+  let isDead = false; // prevent zombie events
 
-  /* =====================
-     CONNECTION UPDATE
-     ===================== */
+  /* ============================
+        CONNECTION HANDLER
+  ============================ */
   sock.ev.on("connection.update", async (update) => {
+
+    if (isDead) return;
     const { connection, qr, lastDisconnect } = update;
 
-    // QR
+
+    /* ============================
+           HANDLE QR CODE
+    ============================ */
     if (qr) {
       const dataUrl = await qrcode.toDataURL(qr);
       await Bot.findOneAndUpdate(
@@ -36,71 +43,94 @@ module.exports = async function createBot(user) {
       );
     }
 
-    // CONNECTED
-    if (connection === "open") {
-      reconnecting = false;
 
+    /* ============================
+           CONNECTED
+    ============================ */
+    if (connection === "open") {
       await Bot.findOneAndUpdate(
         { uid: user._id },
         {
           connected: true,
           qr: null,
           phone: sock.user?.id
-        }
+        },
+        { upsert: true }
       );
 
       console.log("✅ WA connected:", user._id);
     }
 
-    // DISCONNECTED
-    if (connection === "close") {
-      const code = lastDisconnect?.error?.output?.statusCode;
 
-      // LOGOUT → stop total (butuh QR ulang)
-      if (code === DisconnectReason.loggedOut) {
-        await Bot.findOneAndUpdate(
-          { uid: user._id },
-          { connected: false, qr: null }
-        );
-        console.log("🧼 Logged out, need QR");
+    /* ============================
+           DISCONNECTED
+    ============================ */
+    if (connection === "close") {
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+
+      if (statusCode === DisconnectReason.loggedOut) {
+        console.log("Logged out:", user._id);
+        isDead = true;
         return;
       }
 
-      // 🔁 auto reconnect 1x (AMAN untuk pairing)
-      if (!reconnecting) {
-        reconnecting = true;
-        console.log("🔄 Reconnecting once...");
-        setTimeout(() => createBot(user), 1500);
-      }
+      console.log("🔁 Trying reconnect by restarting socket...");
+
+      try {
+          await sock.ws.close(); 
+      } catch {}
+
+      isDead = true;
+
+      setTimeout(() => {
+        createBot(user);        
+      }, 1000);
     }
   });
 
-  /* =====================
-     SAVE CREDS (SAFE)
-     ===================== */
+  /* ============================
+        SAVE CREDS SAFE
+  ============================ */
   sock.ev.on("creds.update", async () => {
-  try {
-    await saveCreds();
-  } catch (e) {
-    if (e.code === "ENOENT") {
-      console.warn("⚠️ creds.json missing, save skipped");
-      return;
+    try {
+      await saveCreds();
+    } catch (err) {
+      if (err.code === "ENOENT") {
+        console.warn("⚠️ creds skipped (ENOENT)");
+        return;
+      }
+      throw err;
     }
-    throw e;
-  }
-});
+  });
 
-  /* =====================
-     MESSAGE HANDLER
-     ===================== */
+
+
+  /* ============================
+        MESSAGE HANDLER
+  ============================ */
   sock.ev.on("messages.upsert", async (m) => {
+    if (isDead) return;
+
     try {
       await handleMessage(sock, user, m);
-    } catch (e) {
-      if (e?.name === "SessionError") return; // crypto reset → ignore
-      throw e;
+
+    } catch (err) {
+      // crypto rotate error → skip
+      if (err?.name === "SessionError") return;
+
+      console.log("Message error:", err.message);
     }
   });
+
+
+  /* ============================
+        CLEAN EXIT
+  ============================ */
+  sock.killInstance = async () => {
+    try { await sock.ws.close(); } catch {}
+    try { sock.ev.removeAllListeners(); } catch {}
+    isDead = true;
+  };
 
   return sock;
 };

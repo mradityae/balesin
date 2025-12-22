@@ -122,31 +122,5 @@ exports.deleteUser = async (req, res) => {
 };
 
 
-exports.deactivateSubscription = async (req, res) => {
-  const { userId } = req.body;
-
-  const expiredDate = new Date();
-  expiredDate.setDate(expiredDate.getDate() - 1);
-
-  botManager.stop(userId);
-
-  await Bot.updateOne(
-    { uid: userId },
-    {
-      $set: {
-        connected: false,
-        qr: null,
-        updatedAt: new Date(),
-      },
-    }
-  );
-
-  await User.findByIdAndUpdate(userId, {
-    subscribedUntil: expiredDate,
-  });
-
-  res.json({ success: true });
-};
-
 
 

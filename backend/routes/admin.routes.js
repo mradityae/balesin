@@ -8,7 +8,6 @@ r.use(role("admin"));
 
 r.get("/users", c.listUsers);
 r.post("/activate-subscription", c.activateSubscription);
-r.post("/deactivate-subscription", c.deactivateSubscription);
 r.post("/delete-user", c.deleteUser);
 
 
