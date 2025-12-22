@@ -4,28 +4,41 @@ import { setToken } from "../utils/auth";
 import { useNavigate, Link } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import Swal from "sweetalert2";
+import ReCAPTCHA from "react-google-recaptcha";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [failCount, setFailCount] = useState(0);
+  const [captcha, setCaptcha] = useState(null);
   const nav = useNavigate();
 
   const submit = async () => {
+
     if (!email || !password) {
       Swal.fire({ icon: "warning", text: "Email dan password wajib diisi" });
+      return;
+    }
+
+    if (failCount >= 3 && !captcha) {
+      Swal.fire({ icon: "warning", text: "Captcha wajib diisi!" });
       return;
     }
 
     try {
       setLoading(true);
 
-      const res = await api.post("/auth/login", { email, password });
+      const res = await api.post("/auth/login", {
+        email,
+        password,
+        captcha,
+      });
+
       const token = res.data.token;
 
       setToken(token);
-
-      const payload = jwtDecode(token); // Baca role dari token
+      const payload = jwtDecode(token);
 
       Swal.fire({
         icon: "success",
@@ -43,6 +56,7 @@ export default function Login() {
       }, 1000);
 
     } catch (err) {
+      setFailCount(prev => prev + 1);
       Swal.fire({
         icon: "error",
         text: "Email atau password salah",
@@ -56,7 +70,7 @@ export default function Login() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gray-100 px-4">
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-lg p-8 w-full max-w-md relative">
+      <div className="bg-white border rounded-xl shadow-lg p-8 w-full max-w-md relative">
 
         <Link
           to="/"
@@ -82,12 +96,21 @@ export default function Login() {
         />
 
         <input
-          className="w-full border px-4 py-3 mb-6 rounded-lg"
+          className="w-full border px-4 py-3 mb-4 rounded-lg"
           type="password"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+
+        {failCount >= 3 && (
+          <div className="mb-4 flex justify-center">
+            <ReCAPTCHA
+              sitekey="6LdqUTMsAAAAABl_OU6YkHVToIvsJe2eA0_oY2Vf"
+              onChange={setCaptcha}
+            />
+          </div>
+        )}
 
         <button
           onClick={submit}
@@ -105,6 +128,7 @@ export default function Login() {
         </p>
 
       </div>
+
     </div>
   );
 }
