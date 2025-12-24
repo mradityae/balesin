@@ -1,6 +1,7 @@
 const BotManager = require("../bot/botManager");
 const User = require("../models/User");
 const Bot = require("../models/Bot");
+const pay = require("../models/PaymentProof")
 const { clearSession } = require("../bot/sessionManager");
 
 exports.start = async (req, res) => {
@@ -22,15 +23,24 @@ async function resetSessionByUserId(userId) {
 
   await BotManager.stop(userId);
   await new Promise(r => setTimeout(r, 500));
+
   clearSession(userId);
+
   await Bot.findOneAndUpdate(
     { uid: userId },
     { connected: false, qr: null, phone: null },
     { upsert: true }
   );
+
   await User.findByIdAndUpdate(
     userId,
     { subscribedUntil: null }
+  );
+
+  // FIX DI SINI
+  await pay.updateMany(
+    { userId: userId },
+    { status: "expired" }
   );
 }
 

@@ -103,7 +103,7 @@ export default function Landing() {
         </div>
 
         <img
-          src="/assets/hero.png"
+          src="/src/assets/hero.png"
           className="mx-auto w-44 mt-24 opacity-95 hover:scale-110 transition-all duration-300 drop-shadow-xl"
           alt="hero"
         />
@@ -125,7 +125,7 @@ export default function Landing() {
           {[ 
             {icon:"🤖", title:"Balas Otomatis", text:"Bot membalas chat pelanggan sesuai profil bisnis."},
             {icon:"⚡", title:"Respons Instan", text:"Jawab pelanggan dalam hitungan detik tanpa admin online."},
-            {icon:"📦", title:"Produk & FAQ", text:"AI memahami produk dan FAQ tanpa setting manual."}
+            {icon:"📦", title:"Produk & FAQ", text:"AI memahami produk dan FAQ"}
           ].map((card, i)=>(
             <div key={i}
               className="bg-white/80 backdrop-blur-xl border border-white/50 shadow-xl rounded-3xl px-10 py-14 text-center 
@@ -150,7 +150,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
 
           <img
-            src="/assets/how.png"
+            src="/src/assets/how.png"
             className="w-[360px] mx-auto hover:scale-105 drop-shadow-lg transition-all duration-300"
             alt="how"
           />

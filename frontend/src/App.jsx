@@ -9,6 +9,9 @@ import SetupBusiness from "./pages/SetupBusiness";
 import Landing from "./pages/Landing";
 import ApiConfig from "./pages/ApiConfig";
 
+import PaymentProof from "./pages/PaymentProof";
+import AdminPaymentProof from "./pages/AdminPaymentProof";
+
 import { getToken } from "./utils/auth";
 import { jwtDecode } from "jwt-decode";
 
@@ -92,6 +95,16 @@ export default function App() {
           }
         />
 
+        {/* USER UPLOAD PAYMENT PROOF */}
+        <Route
+          path="/payment-proof"
+          element={
+            <Private>
+              <PaymentProof />
+            </Private>
+          }
+        />
+
         {/* SETTINGS */}
         <Route
           path="/api-config"
@@ -102,12 +115,22 @@ export default function App() {
           }
         />
 
-        {/* ADMIN */}
+        {/* ADMIN AREA */}
         <Route
           path="/admin"
           element={
             <Private admin>
               <Admin />
+            </Private>
+          }
+        />
+
+        {/* ADMIN VERIFIKASI PEMBAYARAN */}
+        <Route
+          path="/admin/payment-proof"
+          element={
+            <Private admin>
+              <AdminPaymentProof />
             </Private>
           }
         />

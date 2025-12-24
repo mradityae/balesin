@@ -11,6 +11,9 @@ export default function Dashboard() {
   const [bot, setBot] = useState(null);
   const [business, setBusiness] = useState(undefined);
 
+  const [paymentStatus, setPaymentStatus] = useState("loading");
+  const [paymentImage, setPaymentImage] = useState("");
+
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState("");
 
@@ -24,6 +27,58 @@ export default function Dashboard() {
   const topRef = useRef(null);
   const nav = useNavigate();
 
+  // =====================================================
+  // CEK PEMBAYARAN SAAT KLIK CONNECT
+  // =====================================================
+  const handleConnect = async () => {
+  const pay = await api.get("/payment-proof/status");
+  const status = pay.data.status;
+
+  if (status === "not_found") {
+    Swal.fire({
+      icon: "warning",
+      title: "Tidak Bisa Connect",
+      text: "Upload bukti pembayaran terlebih dahulu.",
+      confirmButtonText: "Upload",
+    }).then(r => {
+      if (r.isConfirmed) nav("/payment-proof");
+    });
+    return;
+  }
+
+  if (status === "pending") {
+    Swal.fire({
+      icon: "info",
+      title: "Menunggu Verifikasi",
+      text: "Bukti pembayaran sedang diverifikasi oleh admin.",
+      confirmButtonText: "OK",
+    });
+    return;
+  }
+
+  if (status === "rejected") {
+    Swal.fire({
+      icon: "error",
+      title: "Pembayaran Ditolak",
+      text: "Silakan upload ulang bukti pembayaran.",
+      confirmButtonText: "Upload Ulang",
+    }).then(r => {
+      if (r.isConfirmed) nav("/payment-proof");
+    });
+    return;
+  }
+
+  // Jika approved → lanjut connect WhatsApp
+  if (status === "approved") {
+    if (bot?.connected) startBot(true);
+    else startBot(false);
+  }
+};
+
+
+  // =====================================================
+  // LOAD USER
+  // =====================================================
   useEffect(() => {
     const token = getToken();
     if (!token) {
@@ -38,9 +93,24 @@ export default function Dashboard() {
     } catch {
       nav("/login");
     }
-
   }, []);
 
+  // =====================================================
+  // LOAD STATUS PAYMENT
+  // =====================================================
+  const loadPayment = async () => {
+    try {
+      const res = await api.get("/payment-proof/status");
+      setPaymentStatus(res.data.status);
+      setPaymentImage(res.data.imageUrl || "");
+    } catch {
+      setPaymentStatus("not_found");
+    }
+  };
+
+  // =====================================================
+  // LOAD DASHBOARD (BOT + BUSINESS)
+  // =====================================================
   const load = async () => {
     try {
       const [botRes, bizRes] = await Promise.all([
@@ -73,6 +143,9 @@ export default function Dashboard() {
     }
   };
 
+  // =====================================================
+  // START BOT
+  // =====================================================
   const startBot = async (isRestart = false) => {
     try {
       setLoading(true);
@@ -116,16 +189,26 @@ export default function Dashboard() {
     }
   };
 
+  // =====================================================
+  // AUTO LOAD BOT
+  // =====================================================
   useEffect(() => {
     load();
+    loadPayment();  // <-- Tambahan WAJIB
 
     if (!bot?.connected) {
-      const t = setInterval(load, 3000);
+      const t = setInterval(() => {
+        load();
+        loadPayment();
+      }, 3000);
+
       return () => clearInterval(t);
     }
-
   }, [bot?.connected]);
 
+  // =====================================================
+  // SCROLL EFFECT
+  // =====================================================
   useEffect(() => {
     if (bot?.connected && !wasConnected) {
       setWasConnected(true);
@@ -142,11 +225,14 @@ export default function Dashboard() {
     }
   }, [bot?.connected]);
 
+  const formatPhone = (jid) => {
+    if (!jid) return null;
+    const number = jid.split(":")[0].split("@")[0];
+    return "+" + number;
+  };
+
   return (
-    <div
-      ref={topRef}
-      className="min-h-screen bg-gray-50 p-6 md:p-10"
-    >
+    <div ref={topRef} className="min-h-screen bg-gray-50 p-6 md:p-10">
 
       {/* HEADER */}
       <div className="max-w-6xl mx-auto mb-10">
@@ -158,7 +244,7 @@ export default function Dashboard() {
 
         {/* USER INFO */}
         <div className="bg-white shadow border rounded-2xl p-5 flex justify-between items-center mt-6">
-          <div className="">
+          <div>
             <p className="text-xs text-gray-400">Logged in as</p>
             <p className="font-semibold text-gray-700">{userEmail}</p>
           </div>
@@ -175,37 +261,73 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* BUSINESS ALERT */}
-      {business === null && (
-        <div className="max-w-6xl mx-auto mb-8">
-          <div className="bg-yellow-100 border border-yellow-300 rounded-xl p-5 shadow flex justify-between items-center">
-            <div>
-              <p className="font-bold text-yellow-800">
-                Profil bisnis belum disiapkan
-              </p>
-              <p className="text-xs text-yellow-700 mt-1">
-                Bot tidak akan membalas pesan sebelum profil bisnis diisi.
-              </p>
-            </div>
+      {/* ------------------------------------------------ */}
+      {/* PAYMENT STATUS BANNER */}
+      {/* ------------------------------------------------ */}
+      <div className="max-w-6xl mx-auto mb-8">
 
-            <button
-              onClick={() => nav("/setup-business")}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-4 py-2 rounded-lg"
-            >
-              Setup sekarang
-            </button>
-          </div>
+      {paymentStatus === "pending" && (
+        <div className="bg-yellow-100 border border-yellow-300 p-5 rounded-xl shadow">
+          <p className="font-bold text-yellow-800">Bukti pembayaran sedang diverifikasi</p>
+          <p className="text-xs text-yellow-700 mt-1">Admin sedang memeriksa bukti kamu.</p>
         </div>
       )}
 
+      {paymentStatus === "rejected" && (
+        <div className="bg-red-100 border border-red-300 p-5 rounded-xl shadow">
+          <p className="font-bold text-red-800">Bukti pembayaran ditolak</p>
+          <p className="text-xs text-red-700 mt-1">Silakan upload ulang bukti pembayaran.</p>
+
+          <button
+            onClick={() => nav("/payment-proof")}
+            className="mt-3 bg-red-600 hover:bg-red-700 text-white text-xs px-4 py-2 rounded-lg"
+          >
+            Upload Ulang
+          </button>
+        </div>
+      )}
+
+      {(paymentStatus === "not_found" || paymentStatus === "expired") && (
+        <div className="bg-orange-100 border border-orange-300 p-5 rounded-xl shadow">
+          <p className="font-bold text-orange-800">Belum upload bukti pembayaran</p>
+          <p className="text-xs text-orange-700 mt-1">Upload dulu sebelum connect WhatsApp.</p>
+
+          <button
+            onClick={() => nav("/payment-proof")}
+            className="mt-3 bg-orange-500 hover:bg-orange-600 text-white text-xs px-4 py-2 rounded-lg"
+          >
+            Upload Bukti Pembayaran
+          </button>
+        </div>
+      )}
+
+      {/* ✅ AKUN SUDAH AKTIF */}
+      {paymentStatus === "approved" && (
+        <div className="bg-green-100 border border-green-300 p-5 rounded-xl shadow">
+          <p className="font-bold text-green-800">Akun Anda Telah Aktif ✓</p>
+
+          <p className="text-xs text-green-700 mt-1">
+            Silakan klik tombol <b>Connect WhatsApp</b> untuk menjalankan bot.
+          </p>
+
+          <p className="text-xs text-green-700 mt-1">
+            Nomor WhatsApp Anda:{" "}
+            <b>{formatPhone(bot?.phone) || "Belum terhubung / nomor tidak terdeteksi"}</b>
+          </p>
+        </div>
+      )}
+
+
+    </div>
+
+      {/* ------------------------------------------------ */}
       {/* BODY */}
+      {/* ------------------------------------------------ */}
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
 
         {/* BOT STATUS */}
         <div className="bg-white border rounded-2xl shadow p-6">
-          <h3 className="text-lg font-bold mb-4">
-            Status Bot
-          </h3>
+          <h3 className="text-lg font-bold mb-4">Status Bot</h3>
 
           <div className="flex items-center justify-between">
 
@@ -223,10 +345,7 @@ export default function Dashboard() {
             </div>
 
             <button
-              onClick={() => {
-                if (bot?.connected) startBot(true);
-                else startBot(false);
-              }}
+              onClick={handleConnect}     // ⬅ DIUBAH PENTING
               disabled={loading}
               className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-6 py-2 rounded-xl shadow disabled:opacity-50"
             >
@@ -243,9 +362,7 @@ export default function Dashboard() {
         {/* BUSINESS */}
         {business && (
           <div className="bg-white border rounded-2xl shadow p-6">
-            <h3 className="text-lg font-bold mb-4">
-              Profil Bisnis
-            </h3>
+            <h3 className="text-lg font-bold mb-4">Profil Bisnis</h3>
 
             <div className="space-y-2 text-sm text-gray-700">
               <p><b>Nama:</b> {business.name}</p>
@@ -293,7 +410,6 @@ export default function Dashboard() {
         </div>
 
       </div>
-
     </div>
   );
 }
