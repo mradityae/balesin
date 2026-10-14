@@ -1,6 +1,7 @@
 const Business = require("../models/BusinessProfile");
 
 async function buildContext(userId) {
+  console.log("userid : ",userId)
   const business = await Business.findOne({ userId });
   if (!business) return null;
 

@@ -4,10 +4,12 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import FinancePage from "./pages/FinancePage";
 import Admin from "./pages/Admin";
 import SetupBusiness from "./pages/SetupBusiness";
 import Landing from "./pages/Landing";
 import ApiConfig from "./pages/ApiConfig";
+import RekapPage from "./pages/RekapPage";
 
 import PaymentProof from "./pages/PaymentProof";
 import AdminPaymentProof from "./pages/AdminPaymentProof";
@@ -48,6 +50,8 @@ export default function App() {
       <Routes>
 
         {/* PUBLIC LANDING (auto redirect kalau sudah login) */}
+        <Route path="/rekap" element={<RekapPage />} />
+        <Route path="/rekap/:token" element={<RekapPage />} />
         <Route
           path="/"
           element={
@@ -82,6 +86,16 @@ export default function App() {
           element={
             <Private>
               <Dashboard />
+            </Private>
+          }
+        />
+
+        {/* USER AREA */}
+        <Route
+          path="/finance"
+          element={
+            <Private>
+              <FinancePage />
             </Private>
           }
         />

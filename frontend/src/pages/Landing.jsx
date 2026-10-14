@@ -1,214 +1,172 @@
 import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
+import { 
+  Bot, ArrowRight, Zap, Check, 
+  Shield, Sparkles, Receipt, MessageSquare, TrendingUp, Clock, Smartphone
+} from "lucide-react";
 
 export default function Landing() {
-
-  const scrollTo = (id) => {
-    document.querySelector(id)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
-
   useEffect(() => {
     const targets = document.querySelectorAll(".scroll-fade");
     const obs = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          entry.target.classList.remove("opacity-0", "translate-y-6");
           entry.target.classList.add("opacity-100", "translate-y-0");
         }
       });
-    });
-
+    }, { threshold: 0.1 });
     targets.forEach((el) => obs.observe(el));
+    return () => obs.disconnect();
   }, []);
 
   return (
-    <div className="bg-white text-slate-800 font-inter overflow-hidden">
+    <div className="bg-[#020617] text-slate-200 font-sans selection:bg-emerald-500/30 min-h-screen">
+      
+      {/* GLOW EFFECT BACKGROUND */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-[600px] -z-10 opacity-30">
+        <div className="absolute top-[-10%] left-[10%] w-[400px] h-[400px] bg-emerald-600 rounded-full blur-[120px]"></div>
+        <div className="absolute top-[10%] right-[10%] w-[300px] h-[300px] bg-teal-600 rounded-full blur-[100px]"></div>
+      </div>
 
-      {/* NAV */}
-      <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/80 border-b border-white/20 shadow-[0_6px_20px_rgba(0,0,0,0.05)]">
-        <div className="max-w-7xl mx-auto flex items-center justify-between py-4 px-6">
-
-          <h1
-            className="text-3xl tracking-tight font-extrabold text-blue-600 cursor-pointer hover:scale-105 transition-transform"
-            onClick={() => scrollTo("body")}
-          >
-            BalesinAI
-          </h1>
-
-          <nav className="hidden md:flex gap-10 font-medium text-slate-600">
-            <button onClick={() => scrollTo("#fitur")} className="hover:text-blue-600 hover:scale-105 transition">
-              Fitur
-            </button>
-
-            <button onClick={() => scrollTo("#cara")} className="hover:text-blue-600 hover:scale-105 transition">
-              Cara Kerja
-            </button>
-
-            <button onClick={() => scrollTo("#harga")} className="hover:text-blue-600 hover:scale-105 transition">
-              Harga
-            </button>
-          </nav>
-
-          <Link
-            to="/login"
-            className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 hover:scale-105 transition text-white text-sm font-semibold shadow-md"
-          >
-            Login
-          </Link>
-
+      {/* NAVBAR */}
+      <nav className="fixed top-0 w-full z-50 border-b border-white/5 backdrop-blur-md bg-[#020617]/50">
+        <div className="max-w-7xl mx-auto flex items-center justify-between h-20 px-6">
+          <div className="flex items-center gap-2">
+            <div className="bg-emerald-600 p-2 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.4)]">
+              <Bot className="text-white" size={24} />
+            </div>
+            <h1 className="text-xl font-extrabold tracking-tighter text-white">Keuangan AI</h1>
+          </div>
+          <div className="flex items-center gap-6">
+            <Link to="/login" className="text-sm font-bold text-slate-300 hover:text-white transition">Login</Link>
+            <Link to="/register" className="px-5 py-2.5 rounded-full bg-emerald-500 text-slate-950 text-sm font-black hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/20">Mulai Sekarang</Link>
+          </div>
         </div>
-      </header>
+      </nav>
 
-      {/* HERO */}
-      <section className="relative overflow-hidden pt-28 pb-36 text-center px-8 bg-gradient-to-b from-blue-50 to-transparent scroll-fade opacity-0 translate-y-6 transition-all duration-700">
-
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="w-96 h-96 bg-blue-200/40 rounded-full blur-3xl absolute top-10 left-10"></div>
-          <div className="w-96 h-96 bg-indigo-200/40 rounded-full blur-3xl absolute bottom-0 right-10"></div>
-        </div>
-
-        <div className="relative max-w-4xl mx-auto">
-
-          <h2 className="text-6xl font-extrabold tracking-tight text-slate-900 leading-tight drop-shadow-sm">
-            Customer Service WhatsApp Otomatis
-            <span className="bg-gradient-to-tr from-blue-600 to-indigo-600 bg-clip-text text-transparent block mt-2">
-              untuk bisnis modern
-            </span>
+      {/* HERO SECTION */}
+      <section className="pt-40 pb-20 px-6">
+        <div className="max-w-5xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-black uppercase tracking-widest mb-8">
+            <Sparkles size={14} /> Otomatisasi Catatan Keuangan WhatsApp
+          </div>
+          <h2 className="text-5xl md:text-7xl font-black text-white leading-tight tracking-tight mb-8">
+            Catat Keuangan Bisnis <br /> 
+            <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent italic">Cukup Lewat WhatsApp</span>
           </h2>
-
-          <p className="text-lg text-slate-600 mt-6 leading-relaxed max-w-2xl mx-auto">
-            Balesin AI membalas chat pelanggan secara otomatis 24/7 menggunakan kecerdasan buatan.
-            Hemat biaya CS dan naikan omset bisnis kamu.
+          <p className="text-base md:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed mb-10 font-medium">
+            Kirim teks transaksi atau foto struk belanjaan langsung ke nomor WhatsApp Bot. AI akan mencatat, mengelompokkan, dan menampilkan laporan keuangan real-time di dashboard web Anda.
           </p>
-
-          <div className="mt-12 flex flex-col sm:flex-row justify-center gap-5">
-            <Link
-              to="/register"
-              className="px-10 py-4 rounded-xl bg-blue-600 hover:bg-blue-700 hover:scale-105 transition text-white text-lg font-bold shadow-xl shadow-blue-600/20"
-            >
-              Daftar Gratis →
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <Link to="/register" className="px-8 py-4 rounded-2xl bg-emerald-600 text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-emerald-500 transition shadow-xl shadow-emerald-600/20 active:scale-95">
+              Aktifkan Keuangan AI <ArrowRight size={20} />
             </Link>
+          </div>
+        </div>
+      </section>
 
-            <button
-              onClick={() => scrollTo("#fitur")}
-              className="px-10 py-4 rounded-xl border border-slate-300 hover:bg-slate-100 hover:scale-105 transition text-lg font-semibold"
-            >
-              Pelajari dulu
-            </button>
+      {/* FEATURE HIGHLIGHTS */}
+      <section className="py-16 px-6 border-y border-white/5 bg-white/[0.01]">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
+          <div className="bg-white/5 p-8 rounded-3xl border border-white/10 hover:border-emerald-500/40 transition">
+            <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-400 w-fit mb-5">
+              <MessageSquare size={26} />
+            </div>
+            <h3 className="text-lg font-black text-white mb-2">Catat via Chat & Struk</h3>
+            <p className="text-xs text-slate-400 font-medium leading-relaxed">
+              Cukup ketik pesan singkat atau kirim foto nota/struk belanja. AI secara cerdas mengurai nama barang, harga, dan jenis transaksi.
+            </p>
           </div>
 
-        </div>
-
-        <img
-          src="/src/assets/hero.png"
-          className="mx-auto w-44 mt-24 opacity-95 hover:scale-110 transition-all duration-300 drop-shadow-xl"
-          alt="hero"
-        />
-      </section>
-
-
-      {/* FITUR */}
-      <section id="fitur" className="bg-[#f9fafb] py-28 px-6 scroll-fade opacity-0 translate-y-6 transition-all duration-700 delay-200">
-
-        <div className="max-w-4xl mx-auto text-center mb-20">
-          <h3 className="text-4xl font-extrabold text-slate-900 mb-4">Kenapa pilih Balesin AI?</h3>
-          <p className="text-slate-600 text-lg">
-            Bot WhatsApp pintar untuk otomatisasi bisnis kamu.
-          </p>
-        </div>
-
-        <div className="max-w-6xl mx-auto grid gap-10 md:grid-cols-3">
-
-          {[ 
-            {icon:"🤖", title:"Balas Otomatis", text:"Bot membalas chat pelanggan sesuai profil bisnis."},
-            {icon:"⚡", title:"Respons Instan", text:"Jawab pelanggan dalam hitungan detik tanpa admin online."},
-            {icon:"📦", title:"Produk & FAQ", text:"AI memahami produk dan FAQ"}
-          ].map((card, i)=>(
-            <div key={i}
-              className="bg-white/80 backdrop-blur-xl border border-white/50 shadow-xl rounded-3xl px-10 py-14 text-center 
-              hover:-translate-y-2 hover:scale-[1.04] hover:shadow-2xl
-              transition-all duration-300"
-            >
-              <span className="text-5xl drop-shadow">{card.icon}</span>
-              <h4 className="font-bold text-2xl mt-6 mb-3">{card.title}</h4>
-              <p className="text-slate-500 text-base leading-relaxed">{card.text}</p>
+          <div className="bg-white/5 p-8 rounded-3xl border border-white/10 hover:border-emerald-500/40 transition">
+            <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-400 w-fit mb-5">
+              <Smartphone size={26} />
             </div>
-          ))}
+            <h3 className="text-lg font-black text-white mb-2">Tanpa Scan QR Kode</h3>
+            <p className="text-xs text-slate-400 font-medium leading-relaxed">
+              Satu kali mendaftar, nomor WhatsApp Anda langsung ter-whitelist secara otomatis di server tanpa perlu repot melakukan scan QR.
+            </p>
+          </div>
 
+          <div className="bg-white/5 p-8 rounded-3xl border border-white/10 hover:border-emerald-500/40 transition">
+            <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-400 w-fit mb-5">
+              <TrendingUp size={26} />
+            </div>
+            <h3 className="text-lg font-black text-white mb-2">Dashboard Real-time</h3>
+            <p className="text-xs text-slate-400 font-medium leading-relaxed">
+              Pantau total pemasukan, pengeluaran, serta riwayat transaksi dengan pembaruan otomatis (live sync) setiap ada pesan masuk.
+            </p>
+          </div>
         </div>
       </section>
 
+      {/* PRICING SECTION */}
+      <section id="harga" className="py-24 px-6 relative">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-black text-white mb-4 uppercase tracking-tight">Investasi Sangat Hemat</h2>
+            <p className="text-slate-400 text-sm font-medium">Satu paket lengkap untuk memantau pencatatan keuangan bisnis Anda 24/7.</p>
+          </div>
 
-      {/* HOW WORKS */}
-      <section id="cara"
-        className="py-36 px-6 scroll-fade opacity-0 translate-y-6 transition-all duration-700 delay-300"
-      >
+          {/* SINGLE PAKET KEUANGAN AI */}
+          <div className="bg-gradient-to-b from-slate-900 to-[#020617] border-2 border-emerald-500 p-8 md:p-12 rounded-[3rem] shadow-2xl relative overflow-hidden max-w-xl mx-auto">
+            <div className="absolute top-0 right-0 bg-emerald-500 text-slate-950 px-6 py-2 rounded-bl-2xl text-xs font-black uppercase tracking-widest">
+              Best Deal
+            </div>
 
-        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+            <div className="mb-6">
+              <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase px-3 py-1 rounded-full border border-emerald-500/20 tracking-wider">
+                Otomatis Whitelist WA
+              </span>
+              <h3 className="text-3xl font-black text-white mt-3 uppercase tracking-tight">Paket Keuangan AI</h3>
+              <p className="text-xs text-slate-400 font-medium mt-1">Solusi praktis pencatatan keuangan tanpa ribet.</p>
+            </div>
 
-          <img
-            src="/src/assets/how.png"
-            className="w-[360px] mx-auto hover:scale-105 drop-shadow-lg transition-all duration-300"
-            alt="how"
-          />
+            <div className="mb-8 p-6 bg-white/5 rounded-2xl border border-white/10 flex items-baseline justify-between">
+              <div>
+                <span className="text-sm text-slate-500 line-through font-bold block">Rp 250.000 / bln</span>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-4xl md:text-5xl font-black text-emerald-400">Rp 60.000</span>
+                  <span className="text-slate-400 text-xs font-bold"> / bulan</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-full uppercase tracking-wider">
+                  ~Rp 2.000 / hari
+                </span>
+              </div>
+            </div>
 
-          <div>
-            <h3 className="text-4xl font-extrabold text-slate-900 mb-6">Cara Kerja Balesin AI</h3>
-
-            <ul className="text-slate-600 space-y-4 text-lg leading-relaxed">
-              <li>✓ Daftar & setup profil bisnis</li>
-              <li>✓ Scan QR WhatsApp untuk bot</li>
-              <li>✓ Tambahkan produk & FAQ</li>
-              <li>✓ AI auto jawab pelanggan 24/7</li>
+            <ul className="space-y-4 mb-10">
+              {[
+                "Otomatis Whitelist Nomor WA dari Profil",
+                "Pencatatan Otomatis dari Chat WhatsApp",
+                "Pencatatan Otomatis dari Foto Struk / Nota",
+                "Cek Laporan & Riwayat Keuangan via WA",
+                "Hapus/Batal Transaksi Langsung via WA",
+                "Dashboard Analisis & Grafik Keuangan Web Real-time"
+              ].map((item, idx) => (
+                <li key={idx} className="flex gap-3 text-xs md:text-sm text-slate-200 font-bold">
+                  <Check size={18} className="text-emerald-400 shrink-0 mt-0.5" />
+                  <span>{item}</span>
+                </li>
+              ))}
             </ul>
 
-          </div>
-        </div>
-      </section>
-
-
-      {/* PRICE */}
-      <section id="harga"
-        className="bg-white py-36 px-6 scroll-fade opacity-0 translate-y-6 transition-all duration-700 delay-500">
-
-        <div className="max-w-6xl mx-auto text-center">
-
-          <h3 className="text-4xl font-extrabold mb-12 text-slate-900">Harga Balesin AI</h3>
-
-          <div
-            className="max-w-sm mx-auto bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-3xl p-14 shadow-[0_0_30px_rgba(37,99,235,0.35)]
-            hover:scale-105 transition-all duration-300"
-          >
-            <p className="uppercase tracking-widest text-xs mb-5 opacity-80">
-              Bulanan
-            </p>
-
-            <h4 className="text-6xl font-extrabold leading-none mb-6 drop-shadow-md">
-              Rp 99K
-            </h4>
-
-            <p className="opacity-90 mb-10 text-base">
-              Full akses AI WhatsApp otomatis tanpa batas chat.
-            </p>
-
-            <Link
-              to="/register"
-              className="bg-white text-blue-700 font-bold hover:bg-slate-100 hover:scale-105 transition px-10 py-3 rounded-2xl shadow text-lg"
+            <Link 
+              to="/register" 
+              className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-center font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20 transition active:scale-95"
             >
-              Mulai Sekarang →
+              Berlangganan Sekarang <ArrowRight size={18} />
             </Link>
           </div>
 
         </div>
       </section>
 
-
       {/* FOOTER */}
-      <footer className="text-center py-14 text-slate-500 text-sm border-t border-slate-200">
-        © {new Date().getFullYear()} BalesinAI — WhatsApp Automation Platform.
+      <footer className="py-10 border-t border-white/5 text-center text-xs text-slate-500 font-medium">
+        <p>© {new Date().getFullYear()} Keuangan AI. All Rights Reserved.</p>
       </footer>
 
     </div>

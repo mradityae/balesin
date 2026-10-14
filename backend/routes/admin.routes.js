@@ -7,6 +7,7 @@ r.use(auth);
 r.use(role("admin"));
 
 r.get("/users", c.listUsers);
+r.get("/user/:id", c.getUserById); // 🆕 Endpoint baru get user by ID
 r.post("/activate-subscription", c.activateSubscription);
 r.post("/delete-user", c.deleteUser);
 

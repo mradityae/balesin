@@ -1,7 +1,7 @@
 const BotManager = require("../bot/botManager");
 const User = require("../models/User");
 const Bot = require("../models/Bot");
-const pay = require("../models/PaymentProof")
+const pay = require("../models/PaymentProof");
 const { clearSession } = require("../bot/sessionManager");
 
 exports.start = async (req, res) => {
@@ -67,6 +67,12 @@ exports.resetSession = async (req, res) => {
     await User.findByIdAndUpdate(
       userId,
       { subscribedUntil: null }
+    );
+
+    // FIX DI SINI
+    await pay.updateMany(
+      { userId: userId },
+      { status: "expired" }
     );
 
     return res.json({ success: true });

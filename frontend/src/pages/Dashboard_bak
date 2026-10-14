@@ -1,0 +1,514 @@
+import React, { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../services/api";
+import TopBar from "../components/TopBar";
+import Swal from "sweetalert2";
+import { getToken } from "../utils/auth";
+import { jwtDecode } from "jwt-decode";
+import { 
+  QrCode, RefreshCw, MessageSquare, 
+  Building2, CheckCircle2, AlertCircle, 
+  User, Settings, ShieldCheck, Bot, Zap, ArrowRight,
+  LayoutDashboard
+} from "lucide-react";
+
+// 1. Import Component Finance
+import FinanceAssistant from "../components/FinanceAssistant";
+import FinanceWhitelistManager from "../components/FinanceWhitelistManager";
+
+export default function Dashboard() {
+  const [bot, setBot] = useState(null);
+  const [business, setBusiness] = useState(undefined);
+  const [paymentStatus, setPaymentStatus] = useState("loading");
+  const [paymentImage, setPaymentImage] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [wasConnected, setWasConnected] = useState(false);
+
+  // --- NEW STATE UNTUK TAB & PAKET ---
+  const [activeTab, setActiveTab] = useState("main");
+  const [selectedPkg, setSelectedPkg] = useState(null);
+  const [months, setMonths] = useState(1);
+
+  const pricingPlans = [
+    { 
+      id: 'cs', 
+      name: 'CS Agent AI', 
+      price: 99000, 
+      oldPrice: '250k',
+      features: ['Knowledge Base Setup', 'Smart Context Response', 'Informasi FAQ', 'Admin Contact Referral'] 
+    },
+    { 
+      id: 'finance', 
+      name: 'Keuangan AI', 
+      price: 149000, 
+      oldPrice: '400k',
+      features: ['Catat Pemasukan/Pengeluaran', 'Laporan Bulanan AI', 'Analisis Cashflow', 'Export Laporan'] 
+    },
+    { 
+      id: 'bundle', 
+      name: 'Bundle Super AI', 
+      price: 200000, 
+      oldPrice: '650k',
+      best: true,
+      features: ['Semua Fitur CS + Keuangan', 'Priority AI Processing', 'Satu Nomor WhatsApp', 'Premium Support'] 
+    },
+  ];
+
+  const qrRef = useRef(null);
+  const topRef = useRef(null);
+  const nav = useNavigate();
+
+  // --- LOGIKA KONEKSI ---
+  const handleConnect = async () => {
+    if (!business || !business.name || !business.description) {
+      Swal.fire({
+        icon: "warning",
+        title: "Knowledge Base Kosong",
+        text: "Anda harus mengisi data bisnis & knowledge base agar AI bisa merespon pesan.",
+        confirmButtonText: "ISI SEKARANG",
+        confirmButtonColor: "#2563eb",
+      }).then((r) => {
+        if (r.isConfirmed) nav("/setup-business");
+      });
+      return;
+    }
+
+    if (userRole === "admin") {
+      if (bot?.connected) startBot(true);
+      else startBot(false);
+      return;
+    }
+
+    try {
+      const pay = await api.get("/payment-proof/status");
+      const status = pay.data.status;
+      
+      if (status === "not_found") {
+        Swal.fire({ 
+          icon: "warning", 
+          title: "Tidak Bisa Connect", 
+          text: "Pilih paket dan upload bukti pembayaran terlebih dahulu.", 
+          confirmButtonColor: "#2563eb" 
+        });
+        return;
+      }
+      if (status === "pending") {
+        Swal.fire({ icon: "info", title: "Menunggu Verifikasi", text: "Bukti pembayaran sedang diverifikasi oleh admin." });
+        return;
+      }
+      if (status === "rejected") {
+        Swal.fire({ 
+          icon: "error", 
+          title: "Pembayaran Ditolak", 
+          text: "Silakan upload ulang bukti pembayaran.", 
+          confirmButtonText: "Upload Ulang" 
+        }).then(r => { if (r.isConfirmed) nav("/payment-proof"); });
+        return;
+      }
+      if (status === "approved") {
+        if (bot?.connected) startBot(true);
+        else startBot(false);
+      }
+    } catch (err) {
+      Swal.fire("Error", "Gagal mengecek status pembayaran", "error");
+    }
+  };
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) { nav("/login"); return; }
+    try {
+      const data = jwtDecode(token);
+      setUserEmail(data.email);
+      setUserRole(data.role);
+    } catch { nav("/login"); }
+  }, []);
+
+  const loadPayment = async () => {
+    if (userRole === "admin") return; 
+    try {
+      const res = await api.get("/payment-proof/status");
+      setPaymentStatus(res.data.status);
+      setPaymentImage(res.data.imageUrl || "");
+      // Update selectedPkg jika dari server ada info paket (opsional)
+      if (res.data.status === 'approved'){
+        setSelectedPkg(res.data);
+      }
+
+    } catch { setPaymentStatus("not_found"); }
+  };
+
+  const load = async () => {
+    try {
+      const [botRes, bizRes] = await Promise.all([api.get("/bot/status"), api.get("/business")]);
+      setBot(botRes.data);
+      setBusiness(bizRes.data);
+      setError(null);
+      if (botRes.data?.qr) setQrLoading(false);
+    } catch (err) {
+      const msg = err.response?.data?.error;
+      if (msg === "No subscription" && userRole !== "admin") {
+        setError(null);
+        return;
+      }
+      setError("Gagal memuat dashboard");
+    }
+  };
+
+  const startBot = async (isRestart = false) => {
+    try {
+      setLoading(true);
+      if (!isRestart) {
+        setQrLoading(true);
+        setBot(b => (b ? { ...b, qr: null } : null));
+      }
+      await api.post("/bot/start");
+      await load();
+      if (!isRestart) {
+        setTimeout(() => { qrRef.current?.scrollIntoView({ behavior: "smooth" }); }, 200);
+      }
+    } catch (err) {
+      setError(isRestart ? "Gagal restart bot" : "Gagal menjalankan bot");
+    } finally {
+      setLoading(false);
+      if (isRestart) setQrLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    loadPayment();
+    if (!bot?.connected) {
+      const t = setInterval(() => { load(); loadPayment(); }, 3000);
+      return () => clearInterval(t);
+    }
+  }, [bot?.connected, userRole]);
+
+  useEffect(() => {
+    if (bot?.connected && !wasConnected) {
+      setWasConnected(true);
+      setTimeout(() => { topRef.current?.scrollIntoView({ behavior: "smooth" }); }, 200);
+      setQrLoading(false);
+    }
+    if (!bot?.connected) setWasConnected(false);
+  }, [bot?.connected]);
+
+  const formatPhone = (jid) => {
+    if (!jid) return null;
+    const number = jid.split(":")[0].split("@")[0];
+    return "+" + number;
+  };
+
+  return (
+    <div ref={topRef} className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-blue-100 pb-20">
+      
+      {/* HEADER AREA */}
+      <div className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <TopBar
+            title="Bot Management Console"
+            subtitle="Pusat Kendali Automasi AI"
+            variant="user"
+          />
+          
+          <div className="bg-slate-50/50 border border-slate-200 rounded-2xl p-3 flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100 text-blue-600">
+                <User size={18} />
+              </div>
+              <div className="leading-tight">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.1em]">Logged Account</p>
+                <p className="font-bold text-slate-700 text-sm">{userEmail}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {userRole === "admin" && (
+                <button 
+                  onClick={() => nav("/admin")}
+                  className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-200"
+                >
+                  <LayoutDashboard size={14} /> Admin Panel
+                </button>
+              )}
+              
+              <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${
+                  userRole === "admin" ? "bg-indigo-600 text-white" : "bg-blue-600 text-white"
+                }`}>
+                {userRole}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-6 mt-8">
+        
+        {/* PAYMENT ALERTS & PRICING */}
+        {userRole !== "admin" && paymentStatus !== "approved" && (
+          <div className="mb-8 space-y-6">
+            {paymentStatus === "pending" && (
+              <div className="bg-amber-50 border border-amber-200 p-5 rounded-[1.5rem] flex items-center gap-4 animate-pulse">
+                <div className="bg-amber-100 p-3 rounded-2xl text-amber-600"><RefreshCw size={20} className="animate-spin" /></div>
+                <div>
+                  <p className="font-black text-amber-900 text-[10px] uppercase tracking-widest">Verifikasi Berjalan</p>
+                  <p className="text-xs text-amber-700 font-medium mt-0.5">Admin sedang meninjau pembayaran Anda. Mohon tunggu sejenak.</p>
+                </div>
+              </div>
+            )}
+
+            {paymentStatus === "rejected" && (
+              <div className="bg-white border-2 border-red-50 p-5 rounded-[1.5rem] flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm border-l-4 border-l-red-500">
+                <div className="flex items-center gap-4">
+                  <AlertCircle className="text-red-500" size={24} />
+                  <div>
+                    <p className="font-black text-red-900 text-[10px] uppercase tracking-widest">Pembayaran Ditolak</p>
+                    <p className="text-xs text-red-700 font-medium">Bukti transfer tidak valid. Silakan pilih paket dan unggah kembali.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(paymentStatus === "not_found" || paymentStatus === "expired" || paymentStatus === "rejected") && (
+              <div className="animate-in fade-in slide-in-from-top-4 duration-700">
+                <div className="text-center mb-8">
+                  <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Pilih Paket Automasi</h2>
+                  <p className="text-xs text-slate-500 font-medium tracking-wide">Aktifkan layanan AI untuk nomor WhatsApp Anda</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {pricingPlans.map((plan) => (
+                    <div 
+                      key={plan.id}
+                      onClick={() => setSelectedPkg(plan)}
+                      className={`cursor-pointer p-6 rounded-[2.5rem] border-2 transition-all relative group flex flex-col justify-between ${
+                        selectedPkg?.id === plan.id 
+                        ? "bg-white border-blue-600 shadow-2xl shadow-blue-100 scale-[1.02]" 
+                        : "bg-white border-slate-200 hover:border-blue-200 shadow-sm"
+                      }`}
+                    >
+                      {plan.best && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-[8px] text-white px-4 py-1 rounded-full font-black uppercase tracking-[0.2em] shadow-lg">
+                          Best Choice
+                        </div>
+                      )}
+                      
+                      <div>
+                        <h4 className="font-black text-slate-800 text-sm uppercase tracking-wider mb-2">{plan.name}</h4>
+                        <div className="flex items-center gap-2 mb-4">
+                            <span className="text-[10px] text-slate-400 line-through font-bold">Rp {plan.oldPrice}</span>
+                            <div className="bg-emerald-100 text-emerald-600 text-[8px] font-black px-2 py-0.5 rounded-md uppercase">Hemat 60%</div>
+                        </div>
+                        <p className="text-blue-600 font-black text-2xl flex items-baseline">
+                          Rp {plan.price.toLocaleString('id-ID')}
+                          <span className="text-[10px] text-slate-400 font-bold ml-1">/bulan</span>
+                        </p>
+                        
+                        <ul className="mt-6 space-y-3">
+                          {plan.features.map((f, i) => (
+                            <li key={i} className="flex items-start gap-2 text-[10px] font-bold text-slate-500 leading-tight">
+                              <CheckCircle2 size={14} className="text-emerald-500 shrink-0" /> {f}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className={`mt-8 w-full py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest text-center transition-all ${
+                        selectedPkg?.id === plan.id ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "bg-slate-100 text-slate-400"
+                      }`}>
+                        {selectedPkg?.id === plan.id ? "PAKET TERPILIH" : "PILIH PAKET"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {selectedPkg && (
+                  <div className="mt-8 bg-slate-900 rounded-[2.5rem] p-8 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl animate-in zoom-in-95 duration-500 overflow-hidden relative">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+                    <div className="flex items-center gap-8 relative z-10">
+                      <div>
+                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em] mb-3">Durasi Berlangganan</p>
+                        <div className="flex items-center gap-4 bg-white/10 p-2 rounded-2xl border border-white/5">
+                          <button onClick={() => setMonths(Math.max(1, months - 1))} className="w-10 h-10 hover:bg-white/10 rounded-xl flex items-center justify-center font-bold text-xl">-</button>
+                          <span className="font-black text-lg w-16 text-center">{months} Bln</span>
+                          <button onClick={() => setMonths(months + 1)} className="w-10 h-10 hover:bg-white/10 rounded-xl flex items-center justify-center font-bold text-xl">+</button>
+                        </div>
+                      </div>
+                      <div className="h-16 w-px bg-white/10 hidden md:block"></div>
+                      <div>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Total Investasi</p>
+                        <p className="text-3xl font-black text-white">Rp {(selectedPkg.price * months).toLocaleString('id-ID')}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => nav("/payment-proof", { state: { plan: selectedPkg, total: selectedPkg.price * months, duration: months } })}
+                      className="bg-blue-600 hover:bg-blue-500 text-white px-10 py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] flex items-center gap-3 shadow-xl shadow-blue-900/40 transition-all active:scale-95 relative z-10"
+                    >
+                      Pembayaran <ArrowRight size={20} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- MAIN INTERFACE (Tampil jika Approved atau Admin) --- */}
+        {(userRole === "admin" || paymentStatus === "approved") && (
+          <div className="space-y-8 animate-in fade-in duration-1000">
+            
+            {/* TAB SWITCHER */}
+            <div className="flex gap-2 p-1.5 bg-slate-200/50 w-fit rounded-2xl mb-8">
+              <button 
+                onClick={() => setActiveTab("main")}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'main' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Main Console
+              </button>
+              
+              {/* Tab Finance: Hanya jika admin atau beli paket finance/bundle */}
+              {(userRole === "admin" || selectedPkg?.planName === 'Keuangan AI' || selectedPkg?.planName === 'Bundle Super AI') && (
+                <button 
+                  onClick={() => setActiveTab("finance")}
+                  className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'finance' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <Zap size={12} className={activeTab === 'finance' ? 'fill-blue-600' : ''}/> AI Finance
+                </button>
+              )}
+            </div>
+
+            {activeTab === "main" ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* CONNECTION ENGINE */}
+                  <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden relative group">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-12 -mt-12 transition-all group-hover:scale-150"></div>
+                    <div className="relative z-10">
+                      <div className="flex justify-between items-center mb-8">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Connection Engine</h3>
+                        <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black border ${bot?.connected ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${bot?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                          {bot?.connected ? "ONLINE" : "DISCONNECTED"}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-center py-6 text-center">
+                        <div className={`w-24 h-24 rounded-[2rem] flex items-center justify-center transition-all duration-500 ${bot?.connected ? 'bg-emerald-50 text-emerald-600 rotate-6 shadow-inner' : 'bg-blue-50 text-blue-600'}`}>
+                            <Bot size={48} />
+                        </div>
+                        <h2 className="text-2xl font-black text-slate-800 mt-6 tracking-tight uppercase">
+                            {bot?.connected ? "Bot Berjalan" : "Bot Berhenti"}
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-2 font-medium max-w-[240px]">
+                          {bot?.connected 
+                            ? `Terhubung: ${formatPhone(bot?.phone)}` 
+                            : "Sambungkan akun WhatsApp untuk mengaktifkan AI."}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleConnect}
+                      disabled={loading}
+                      className={`mt-6 w-full py-4 rounded-2xl font-black text-[11px] tracking-widest uppercase transition-all flex items-center justify-center gap-3 relative z-10 shadow-lg active:scale-95 ${
+                        bot?.connected 
+                        ? 'bg-slate-100 text-slate-600 hover:bg-slate-200 shadow-slate-200' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'
+                      }`}
+                    >
+                      {loading ? <RefreshCw className="animate-spin" size={18}/> : <QrCode size={18}/>}
+                      {loading ? "PROCESSING..." : bot?.connected ? "RESTART SESSION" : "SAMBUNGKAN SEKARANG"}
+                    </button>
+                  </div>
+
+                  {/* BUSINESS INFO CARD */}
+                  <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-indigo-500"></div>
+                    <div className="flex justify-between items-center mb-8">
+                      <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.25em]">AI Knowledge</h3>
+                      <button onClick={() => nav("/setup-business")} className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/10 text-white">
+                        <Settings size={18} />
+                      </button>
+                    </div>
+                    {business ? (
+                      <div className="space-y-6">
+                        <div>
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Business Name</label>
+                          <p className="text-xl font-black text-white flex items-center gap-3 tracking-tight">
+                            <Building2 className="text-blue-500" size={20}/> {business.name || 'Belum Diisi'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Knowledge Base</label>
+                          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[11px] leading-relaxed text-slate-300 italic line-clamp-3">
+                            {business.description ? `"${business.description}"` : 'Deskripsi bisnis belum diatur.'}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                        {/* Kondisi: Hanya tampil jika paket Keuangan AI atau Bundle Super AI */}
+                        {(selectedPkg?.planName === 'Keuangan AI' || selectedPkg?.planName === 'Bundle Super AI') && (
+                          <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                            <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Products</p>
+                            <p className="text-2xl font-black text-white">{business.products?.length || 0}</p>
+                          </div>
+                        )}
+
+                        {/* FAQ Set akan melebar jika Products disembunyikan */}
+                        <div className={`p-4 bg-white/5 rounded-2xl border border-white/10 ${
+                          !(selectedPkg?.planName === 'Keuangan AI' || selectedPkg?.planName === 'Bundle Super AI') 
+                          ? 'col-span-2' 
+                          : ''
+                        }`}>
+                          <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">FAQ Set</p>
+                          <p className="text-2xl font-black text-white">{business.faq?.length || 0}</p>
+                        </div>
+                      </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-center py-10">
+                        <AlertCircle className="text-slate-500 mb-4" size={32} />
+                        <p className="text-slate-400 text-xs mb-6">Knowledge Base belum diatur.</p>
+                        <button onClick={() => nav("/setup-business")} className="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase">SET KNOWLEDGE</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* QR SCAN AREA */}
+                {!bot?.connected && (
+                  <div ref={qrRef} className="bg-white border-2 border-dashed border-blue-100 rounded-[3rem] p-10 flex flex-col items-center text-center shadow-sm mt-8">
+                    <div className="max-w-md mb-8">
+                      <div className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase mb-3 inline-block">Pairing Required</div>
+                      <h3 className="text-2xl font-black text-slate-900">Scan WhatsApp QR</h3>
+                      <p className="text-slate-500 mt-2 text-xs">Buka WhatsApp → Perangkat Tertaut → Scan QR.</p>
+                    </div>
+                    <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-200">
+                      {qrLoading && !bot?.qr ? (
+                        <div className="flex flex-col items-center justify-center w-56 h-56">
+                          <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+                          <p className="text-[9px] font-black uppercase">Generating QR...</p>
+                        </div>
+                      ) : bot?.qr && (
+                        <div className="bg-white p-4 rounded-2xl shadow-xl animate-in zoom-in-95">
+                          <img src={bot.qr} alt="QR" className="w-56 h-56 rounded-lg" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* TAB AI FINANCE */
+              <div className="space-y-8">
+                <FinanceWhitelistManager role={userRole} />
+                <FinanceAssistant />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

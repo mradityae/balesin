@@ -1,109 +1,95 @@
-const MCP = require("../mcp");
-const Business = require("../models/BusinessProfile");
+const Pay = require("../models/PaymentProof");
+const User = require("../models/User");
+const financeHandler = require("./financeHandler");
+const { ObjectId } = require("mongodb");
 
-// helper
-function delay(ms) {
-  return new Promise(r => setTimeout(r, ms));
+/* =====================================================
+   🔥 HELPER: AMBIL NOMOR WA (SUPPORT LID MODE)
+===================================================== */
+function getSenderPhone(msg) {
+  const key = msg.key;
+
+  // ✅ Baileys LID mode (WA terbaru)
+  if (key.remoteJidAlt && key.remoteJidAlt.endsWith("@s.whatsapp.net")) {
+    return key.remoteJidAlt.split("@")[0];
+  }
+
+  // ✅ Grup
+  if (key.remoteJid.endsWith("@g.us")) {
+    return key.participant?.split("@")[0];
+  }
+
+  // ✅ Personal legacy
+  if (key.remoteJid.endsWith("@s.whatsapp.net")) {
+    return key.remoteJid.split("@")[0];
+  }
+
+  return null;
 }
 
-function random(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+/* =====================================================
+   🔥 HELPER: NORMALISASI NOMOR (08xxx -> 628xxx)
+===================================================== */
+function normalizePhone(phone) {
+  if (!phone) return "";
+  let clean = phone.replace(/\D/g, ""); // Hanya ambil angka
+  if (clean.startsWith("0")) {
+    clean = "62" + clean.slice(1);
+  }
+  return clean;
 }
 
-// store typing state per user chat
-const typingState = new Map();
-
-module.exports = async function handleMessage(sock, user, m) {
-
+module.exports = async function handleMessage(sock, hostUser, m) {
   const msg = m.messages?.[0];
   if (!msg || msg.key.fromMe) return;
 
-  const jid = msg.key.remoteJid;
-  const text =
-    msg.message?.conversation ||
-    msg.message?.extendedTextMessage?.text;
+  const rawSenderPhone = getSenderPhone(msg);
 
-  if (!text) return;
-
-  const business = await Business.findOne({ userId: user._id });
-
-  if (!business) {
-    await sock.sendMessage(jid, {
-      text:
-        "Bot belum aktif karena profil bisnis belum dikonfigurasi.\n" +
-        "Silakan login ke dashboard untuk setup bisnis.",
-    });
+  if (!rawSenderPhone) {
+    console.log("❌ senderPhone not found");
     return;
   }
 
+  // Normalisasi nomor pengirim yang sedang chat ke bot
+  const senderPhone = normalizePhone(rawSenderPhone);
 
   /* =====================================================
-      TYPING SYSTEM: MAX 20 SECONDS AND SAFE ABORT
+     1️⃣ CARI USER DI DATABASE YANG NOMOR HP-NYA COCOK DENGAN PENGIRIM CHAT
   ===================================================== */
-  
-  // if bot already typing → skip typing animation for this message
-  if (!typingState.get(jid)) {
+  // Ambil semua user aktif dari database (sehingga jika ada perubahan nomor di DB, langsung terbaca real-time)
+  const activeUsers = await User.find({ isActive: true });
 
-    typingState.set(jid, true);
-
-    (async () => {
-
-      // max 12 loops × 2500ms ≈ 30s total max
-      for (let i = 0; i < 12; i++) {
-
-        // already stopped by reply
-        if (!typingState.get(jid)) break;
-
-        try {
-          await sock.sendPresenceUpdate("composing", jid);
-        } catch {}
-
-        await delay(random(800, 2500));
+  let matchedUser = null;
+  for (const u of activeUsers) {
+    if (u.phone) {
+      const dbUserPhone = normalizePhone(u.phone);
+      if (senderPhone === dbUserPhone) {
+        matchedUser = u;
+        break;
       }
-
-      // safety stop
-      await sock.sendPresenceUpdate("paused", jid);
-
-    })();
+    }
   }
 
+  // Jika nomor pengirim chat TIDAK ADA di database (bukan whitelist), diam total!
+  if (!matchedUser) {
+    console.log(`⛔ Sender phone (${senderPhone}) is not whitelisted in users table.`);
+    return; 
+  }
 
   /* =====================================================
-       AI RESPONSE
+     2️⃣ CEK APAKAH USER TERSEBUT SUDAH SUBSCRIBE (APPROVED) ATAU ADMIN
   ===================================================== */
+  const pay = await Pay.findOne({
+    userId: new ObjectId(matchedUser._id),
+    status: "approved",
+  });
 
-  let reply;
-  try {
-    reply = await MCP(user._id, text);
-
-  } catch (err) {
-    await delay(random(1500, 4000));
-    typingState.set(jid, false);
-    await sock.sendPresenceUpdate("paused", jid);
-
-    console.log("AI error:", err.message);
-
-    await sock.sendMessage(jid, {
-      text: "Maaf, terjadi kesalahan. Silakan coba lagi nanti.",
-    });
-
-    return;
+  // Jika user ini belum bayar dan bukan admin, diam total
+  if (!pay && matchedUser.role !== 'admin') {
+    console.log(`⛔ User ${matchedUser.email} has no active subscription.`);
+    return; 
   }
 
-  
-  /* =====================================================
-      SEND MESSAGE TO USER
-  ===================================================== */
-
-  await delay(random(1500, 4000));
-  typingState.set(jid, false);
-
-  await sock.sendPresenceUpdate("paused", jid);
-
-  try {
-    await sock.sendMessage(jid, { text: reply });
-  } catch (err) {
-    console.log("send error:", err.message);
-  }
-
+  // Jalankan handler Keuangan AI menggunakan data `matchedUser` (pengirim chat yang nomornya sudah terdaftar di DB)
+  await financeHandler(sock, matchedUser, m);
 };

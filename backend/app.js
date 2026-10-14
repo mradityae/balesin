@@ -13,6 +13,8 @@ app.use("/api/admin", require("./routes/admin.routes"));
 app.use("/api/business", require("./routes/business.routes"));
 app.use("/api/uploads", express.static("uploads"));
 app.use("/api/payment-proof", require("./routes/paymentProofRoutes"));
+app.use("/api/finance", require("./routes/finance.routes"));
+app.use("/api/finance/whitelist", require("./routes/financeWhitelist.routes"));
 
 // ===== STATIC FOLDER UNTUK UPLOADS =====
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));

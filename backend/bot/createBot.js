@@ -1,7 +1,8 @@
 const {
   default: makeWASocket,
   useMultiFileAuthState,
-  DisconnectReason
+  DisconnectReason,
+  fetchLatestBaileysVersion
 } = require("@whiskeysockets/baileys");
 const qrcode = require("qrcode");
 const { getSessionPath } = require("./sessionManager");
@@ -13,27 +14,25 @@ module.exports = async function createBot(user) {
   const sessionPath = getSessionPath(user._id);
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
+  // Fetch the actual current WhatsApp web version dynamically
+  const { version, isLatest } = await fetchLatestBaileysVersion();
+  console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`);
+
   const sock = makeWASocket({
     auth: state,
     printQRInTerminal: false,
     syncFullHistory: false,
-    markOnlineOnConnect: true
+    markOnlineOnConnect: true,
+    version, // Use dynamic version instead of hardcoded
+    browser: ["Chrome", "Desktop", "110.0.5481.177"] // Stable browser profile string
   });
 
-  let isDead = false; // prevent zombie events
+  let isDead = false;
 
-  /* ============================
-        CONNECTION HANDLER
-  ============================ */
   sock.ev.on("connection.update", async (update) => {
-
     if (isDead) return;
     const { connection, qr, lastDisconnect } = update;
 
-
-    /* ============================
-           HANDLE QR CODE
-    ============================ */
     if (qr) {
       const dataUrl = await qrcode.toDataURL(qr);
       await Bot.findOneAndUpdate(
@@ -41,12 +40,9 @@ module.exports = async function createBot(user) {
         { qr: dataUrl, connected: false },
         { upsert: true }
       );
+      console.log("📱 QR Code generated for user:", user._id);
     }
 
-
-    /* ============================
-           CONNECTED
-    ============================ */
     if (connection === "open") {
       await Bot.findOneAndUpdate(
         { uid: user._id },
@@ -57,14 +53,9 @@ module.exports = async function createBot(user) {
         },
         { upsert: true }
       );
-
       console.log("✅ WA connected:", user._id);
     }
 
-
-    /* ============================
-           DISCONNECTED
-    ============================ */
     if (connection === "close") {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
 
@@ -74,58 +65,40 @@ module.exports = async function createBot(user) {
         return;
       }
 
-      console.log("🔁 Trying reconnect by restarting socket...");
+      console.log("🔁 Connection dropped. Reconnecting in 5 seconds...");
 
       try {
-          await sock.ws.close(); 
+        await sock.ws.close(); 
       } catch {}
 
       isDead = true;
 
+      // Longer delay to prevent WhatsApp rate-limiting your IP/socket spam
       setTimeout(() => {
         createBot(user);        
-      }, 1000);
+      }, 5000);
     }
   });
 
-  /* ============================
-        SAVE CREDS SAFE
-  ============================ */
   sock.ev.on("creds.update", async () => {
     try {
       await saveCreds();
     } catch (err) {
-      if (err.code === "ENOENT") {
-        console.warn("⚠️ creds skipped (ENOENT)");
-        return;
-      }
+      if (err.code === "ENOENT") return;
       throw err;
     }
   });
 
-
-
-  /* ============================
-        MESSAGE HANDLER
-  ============================ */
   sock.ev.on("messages.upsert", async (m) => {
     if (isDead) return;
-
     try {
       await handleMessage(sock, user, m);
-
     } catch (err) {
-      // crypto rotate error → skip
       if (err?.name === "SessionError") return;
-
       console.log("Message error:", err.message);
     }
   });
 
-
-  /* ============================
-        CLEAN EXIT
-  ============================ */
   sock.killInstance = async () => {
     try { await sock.ws.close(); } catch {}
     try { sock.ev.removeAllListeners(); } catch {}
