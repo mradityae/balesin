@@ -15,7 +15,9 @@ export default function Login() {
   // const [captcha, setCaptcha] = useState(null);
   const nav = useNavigate();
 
-  const submit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault(); // Mencegah reload halaman bawaan form
+
     if (!email || !password) {
       Swal.fire({ icon: "warning", title: "Oops!", text: "Email dan password wajib diisi", confirmButtonColor: "#2563eb" });
       return;
@@ -99,7 +101,8 @@ export default function Login() {
             <p className="text-slate-500 mt-2 font-medium">Senang melihat Anda kembali di BalesinAI.</p>
           </div>
 
-          <div className="space-y-5">
+          {/* Bungkus menggunakan tag <form onSubmit={handleSubmit}> */}
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* EMAIL */}
             <div className="space-y-1.5 group">
               <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
@@ -119,7 +122,7 @@ export default function Login() {
             <div className="space-y-1.5 group">
               <div className="flex justify-between items-center px-1">
                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Password</label>
-                <button className="text-[11px] font-bold text-blue-600 hover:text-blue-700 underline">Lupa Password?</button>
+                <button type="button" className="text-[11px] font-bold text-blue-600 hover:text-blue-700 underline">Lupa Password?</button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={18} />
@@ -151,7 +154,7 @@ export default function Login() {
 
             {/* SUBMIT */}
             <button
-              onClick={submit}
+              type="submit"
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold shadow-xl shadow-blue-200 transition-all hover:-translate-y-1 active:scale-95 disabled:bg-slate-300 disabled:shadow-none disabled:translate-y-0 flex items-center justify-center gap-2 overflow-hidden"
             >
@@ -161,14 +164,14 @@ export default function Login() {
                 <>Sign In to Dashboard <ArrowLeft className="rotate-180" size={18} /></>
               )}
             </button>
+          </form>
 
-            <p className="text-center text-slate-500 text-sm mt-8 font-medium">
-              Belum memiliki akun?{" "}
-              <Link to="/register" className="text-blue-600 font-bold hover:underline italic">
-                Daftar Gratis
-              </Link>
-            </p>
-          </div>
+          <p className="text-center text-slate-500 text-sm mt-8 font-medium">
+            Belum memiliki akun?{" "}
+            <Link to="/register" className="text-blue-600 font-bold hover:underline italic">
+              Daftar Gratis
+            </Link>
+          </p>
 
           <div className="mt-16 text-center border-t border-slate-100 pt-8">
              <div className="flex justify-center gap-4">

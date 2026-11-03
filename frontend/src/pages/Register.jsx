@@ -30,7 +30,9 @@ export default function Register() {
     setEmail(noSpaces);
   };
 
-  const submit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault(); // Mencegah reload halaman bawaan form
+
     if (!name || !email || !phone || !password || !confirmPassword) {
       Swal.fire({ icon: "warning", title: "Data Belum Lengkap", text: "Semua kolom wajib diisi ya!", confirmButtonColor: "#2563eb" });
       return;
@@ -130,7 +132,8 @@ export default function Register() {
             <p className="text-slate-500 mt-2 font-medium">Buat akun Keuangan AI Anda hari ini.</p>
           </div>
 
-          <div className="space-y-4">
+          {/* Bungkus menggunakan tag <form> supaya tombol Enter otomatis men-trigger submit */}
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
               <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Full Name</label>
               <div className="relative group">
@@ -204,8 +207,9 @@ export default function Register() {
               </div>
             </div>
 
+            {/* Ubah tipe button menjadi "submit" */}
             <button
-              onClick={submit}
+              type="submit"
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold shadow-xl shadow-blue-200 transition-all hover:-translate-y-1 active:scale-95 disabled:bg-slate-300 disabled:shadow-none disabled:translate-y-0 mt-2"
             >
@@ -218,14 +222,14 @@ export default function Register() {
                 "Buat Akun Sekarang"
               )}
             </button>
+          </form>
 
-            <p className="text-center text-slate-500 text-sm mt-6 font-medium">
-              Sudah memiliki akun?{" "}
-              <Link to="/login" className="text-blue-600 font-bold hover:underline">
-                Login di sini
-              </Link>
-            </p>
-          </div>
+          <p className="text-center text-slate-500 text-sm mt-6 font-medium">
+            Sudah memiliki akun?{" "}
+            <Link to="/login" className="text-blue-600 font-bold hover:underline">
+              Login di sini
+            </Link>
+          </p>
         </div>
       </div>
     </div>
