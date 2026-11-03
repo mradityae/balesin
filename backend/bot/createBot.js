@@ -8,6 +8,7 @@ const qrcode = require("qrcode");
 const { getSessionPath } = require("./sessionManager");
 const Bot = require("../models/Bot");
 const handleMessage = require("./messageHandler");
+const { setWhatsAppSock } = require("../src/utils/whatsappSender");
 
 module.exports = async function createBot(user) {
 
@@ -54,6 +55,7 @@ module.exports = async function createBot(user) {
         { upsert: true }
       );
       console.log("✅ WA connected:", user._id);
+      setWhatsAppSock(sock);
     }
 
     if (connection === "close") {

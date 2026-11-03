@@ -1,4 +1,5 @@
 const FinancialTransaction = require("../models/FinancialTransaction");
+const User = require("../models/User");
 const mongoose = require("mongoose");
 
 /**
@@ -116,6 +117,7 @@ exports.getAllTransactions = async (req, res) => {
  */
 exports.getPublicSummaryByToken = async (req, res) => {
   try {
+    
     const { token } = req.params;
 
     // Cari user berdasarkan shareToken

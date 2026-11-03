@@ -5,7 +5,7 @@ const { clearSession } = require("../bot/sessionManager");
 
 exports.listUsers = async (req, res) => {
   const query = {
-    role : "user"
+    //role : "user"
   }
   const users = await User.find(query).select("-passwordHash");
   res.json(users);

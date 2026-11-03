@@ -1,11 +1,20 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { 
   Bot, ArrowRight, Zap, Check, 
-  Shield, Sparkles, Receipt, MessageSquare, TrendingUp, Clock, Smartphone
+  Shield, Sparkles, Receipt, MessageSquare, TrendingUp, Clock, Smartphone, RefreshCw
 } from "lucide-react";
+import api from "../services/api";
 
 export default function Landing() {
+  const [pricing, setPricing] = useState({
+    pricePerDay: 2000,
+    priceMonthly: 60000,
+    oldPrice: "250k",
+    activePromoText: "Otomatis Whitelist WA"
+  });
+  const [loadingPricing, setLoadingPricing] = useState(true);
+
   useEffect(() => {
     const targets = document.querySelectorAll(".scroll-fade");
     const obs = new IntersectionObserver((entries) => {
@@ -17,6 +26,22 @@ export default function Landing() {
     }, { threshold: 0.1 });
     targets.forEach((el) => obs.observe(el));
     return () => obs.disconnect();
+  }, []);
+
+  useEffect(() => {
+    api.get("/settings/pricing")
+      .then(res => {
+        if (res?.data) {
+          setPricing({
+            pricePerDay: res.data.pricePerDay || 2000,
+            priceMonthly: res.data.priceMonthly || 60000,
+            oldPrice: res.data.oldPrice || "250k",
+            activePromoText: res.data.activePromoText || "Otomatis Whitelist WA"
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPricing(false));
   }, []);
 
   return (
@@ -51,7 +76,7 @@ export default function Landing() {
             <Sparkles size={14} /> Otomatisasi Catatan Keuangan WhatsApp
           </div>
           <h2 className="text-5xl md:text-7xl font-black text-white leading-tight tracking-tight mb-8">
-            Catat Keuangan Bisnis <br /> 
+            Catat Keuangan untuk <br />Wanita Cerdas <br /> 
             <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent italic">Cukup Lewat WhatsApp</span>
           </h2>
           <p className="text-base md:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed mb-10 font-medium">
@@ -59,7 +84,7 @@ export default function Landing() {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link to="/register" className="px-8 py-4 rounded-2xl bg-emerald-600 text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-emerald-500 transition shadow-xl shadow-emerald-600/20 active:scale-95">
-              Aktifkan Keuangan AI <ArrowRight size={20} />
+              Gunakan Asisten Keuangan anda Sekarang <ArrowRight size={20} />
             </Link>
           </div>
         </div>
@@ -116,49 +141,59 @@ export default function Landing() {
 
             <div className="mb-6">
               <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase px-3 py-1 rounded-full border border-emerald-500/20 tracking-wider">
-                Otomatis Whitelist WA
+                {pricing.activePromoText}
               </span>
               <h3 className="text-3xl font-black text-white mt-3 uppercase tracking-tight">Paket Keuangan AI</h3>
               <p className="text-xs text-slate-400 font-medium mt-1">Solusi praktis pencatatan keuangan tanpa ribet.</p>
             </div>
 
-            <div className="mb-8 p-6 bg-white/5 rounded-2xl border border-white/10 flex items-baseline justify-between">
-              <div>
-                <span className="text-sm text-slate-500 line-through font-bold block">Rp 250.000 / bln</span>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-4xl md:text-5xl font-black text-emerald-400">Rp 60.000</span>
-                  <span className="text-slate-400 text-xs font-bold"> / bulan</span>
+            {loadingPricing ? (
+              <div className="py-12 flex justify-center items-center text-slate-400 text-xs gap-2">
+                <RefreshCw className="animate-spin text-emerald-400" size={18} /> Memuat harga terbaru...
+              </div>
+            ) : (
+              <>
+                <div className="mb-8 p-6 bg-white/5 rounded-2xl border border-white/10 flex items-baseline justify-between">
+                  <div>
+                    <span className="text-sm text-slate-500 line-through font-bold block">Rp {pricing.oldPrice} / bln</span>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-4xl md:text-5xl font-black text-emerald-400">
+                        Rp {Number(pricing.priceMonthly).toLocaleString('id-ID')}
+                      </span>
+                      <span className="text-slate-400 text-xs font-bold"> / bulan</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-full uppercase tracking-wider">
+                      ~Rp {Number(pricing.pricePerDay).toLocaleString('id-ID')} / hari
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="text-right">
-                <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-full uppercase tracking-wider">
-                  ~Rp 2.000 / hari
-                </span>
-              </div>
-            </div>
 
-            <ul className="space-y-4 mb-10">
-              {[
-                "Otomatis Whitelist Nomor WA dari Profil",
-                "Pencatatan Otomatis dari Chat WhatsApp",
-                "Pencatatan Otomatis dari Foto Struk / Nota",
-                "Cek Laporan & Riwayat Keuangan via WA",
-                "Hapus/Batal Transaksi Langsung via WA",
-                "Dashboard Analisis & Grafik Keuangan Web Real-time"
-              ].map((item, idx) => (
-                <li key={idx} className="flex gap-3 text-xs md:text-sm text-slate-200 font-bold">
-                  <Check size={18} className="text-emerald-400 shrink-0 mt-0.5" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+                <ul className="space-y-4 mb-10">
+                  {[
+                    "Otomatis Whitelist Nomor WA dari Profil",
+                    "Pencatatan Otomatis dari Chat WhatsApp",
+                    "Pencatatan Otomatis dari Foto Struk / Nota",
+                    "Cek Laporan & Riwayat Keuangan via WA",
+                    "Hapus/Batal Transaksi Langsung via WA",
+                    "Dashboard Analisis & Grafik Keuangan Web Real-time"
+                  ].map((item, idx) => (
+                    <li key={idx} className="flex gap-3 text-xs md:text-sm text-slate-200 font-bold">
+                      <Check size={18} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
 
-            <Link 
-              to="/register" 
-              className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-center font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20 transition active:scale-95"
-            >
-              Berlangganan Sekarang <ArrowRight size={18} />
-            </Link>
+                <Link 
+                  to="/register" 
+                  className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-center font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20 transition active:scale-95"
+                >
+                  Berlangganan Sekarang <ArrowRight size={18} />
+                </Link>
+              </>
+            )}
           </div>
 
         </div>

@@ -15,6 +15,7 @@ app.use("/api/uploads", express.static("uploads"));
 app.use("/api/payment-proof", require("./routes/paymentProofRoutes"));
 app.use("/api/finance", require("./routes/finance.routes"));
 app.use("/api/finance/whitelist", require("./routes/financeWhitelist.routes"));
+app.use("/api/settings", require("./routes/setting.routes"));
 
 // ===== STATIC FOLDER UNTUK UPLOADS =====
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));

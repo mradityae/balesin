@@ -143,7 +143,7 @@ export default function PaymentProof() {
                    </div>
                    <div className="text-right">
                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Durasi</p>
-                     <p className="font-black text-sm">{duration} Bulan</p>
+                     <p className="font-black text-sm">{duration} Hari</p>
                    </div>
                  </div>
 

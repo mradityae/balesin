@@ -9,7 +9,7 @@ import {
   QrCode, RefreshCw, 
   CheckCircle2, AlertCircle, 
   User, Bot, Zap, ArrowRight,
-  LayoutDashboard, Clock, ShieldCheck, Edit3, X
+  LayoutDashboard, Clock, ShieldCheck, Edit3, X, MessageCircle
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -33,13 +33,13 @@ export default function Dashboard() {
   const [editPhone, setEditPhone] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
 
-  // --- PAKET KEUANGAN AI (Rp 2.000 / HARI) ---
-  const financePlan = {
+  // --- PAKET KEUANGAN AI (Dinamis Berbasis Hari) ---
+  const [financePlan, setFinancePlan] = useState({
     id: 'finance',
     name: 'Keuangan AI',
     pricePerDay: 2000,
-    priceMonthly: 60000, // 2.000 x 30 hari
     oldPrice: '250k',
+    activePromoText: 'Otomatis Whitelist WA',
     features: [
       'Otomatis Whitelist Nomor WA Anda dari Akun Profile',
       'Pencatatan Otomatis dari Chat & Struk Foto',
@@ -48,14 +48,30 @@ export default function Dashboard() {
       'Hapus/Batal Transaksi Langsung via WA',
       'Dashboard Analisis & Grafik Keuangan Web'
     ]
-  };
+  });
 
-  const [months, setMonths] = useState(1);
+  const [daysCount, setDaysCount] = useState(1);
+
   const qrRef = useRef(null);
   const topRef = useRef(null);
   const nav = useNavigate();
 
-  // Logika khusus Admin untuk connect/restart bot engine
+  // Ambil konfigurasi pricing dari backend
+  useEffect(() => {
+    api.get("/settings/pricing")
+      .then(res => {
+        if (res?.data) {
+          setFinancePlan(prev => ({
+            ...prev,
+            pricePerDay: res.data.pricePerDay || 2000,
+            oldPrice: res.data.oldPrice || '250k',
+            activePromoText: res.data.activePromoText || 'Otomatis Whitelist WA'
+          }));
+        }
+      })
+      .catch(() => console.log("Menggunakan default pricing dashboard"));
+  }, []);
+
   const handleAdminConnect = async () => {
     try {
       setLoading(true);
@@ -93,7 +109,6 @@ export default function Dashboard() {
       setUserPhone(phoneVal);
       setSubscribeUntil(subscribedUntilVal);
 
-      // Set default form edit profil
       setEditName(nameVal);
       setEditEmail(emailVal);
       setEditPhone(phoneVal);
@@ -132,11 +147,16 @@ export default function Dashboard() {
   useEffect(() => {
     load();
     loadPayment();
-    if (userRole === "admin" && !bot?.connected) {
-      const t = setInterval(() => { load(); loadPayment(); }, 3000);
-      return () => clearInterval(t);
-    }
-  }, [bot?.connected, userRole]);
+
+    const interval = setInterval(() => {
+      loadPayment();
+      if (userRole === "admin" && !bot?.connected) {
+        load();
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [userRole, bot?.connected]);
 
   useEffect(() => {
     if (bot?.connected && !wasConnected) {
@@ -147,14 +167,13 @@ export default function Dashboard() {
     if (!bot?.connected) setWasConnected(false);
   }, [bot?.connected]);
 
-  // Handle Update Profile
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     try {
       setSavingProfile(true);
       const payload = userRole === "admin" 
-        ? { email: editEmail } // Admin hanya edit email
-        : { name: editName, email: editEmail, phone: editPhone }; // User biasa edit semua
+        ? { email: editEmail } 
+        : { name: editName, email: editEmail, phone: editPhone }; 
 
       const res = await api.put("/auth/profile", payload);
       
@@ -190,15 +209,21 @@ export default function Dashboard() {
   };
 
   const getRemainingDays = () => {
-    if (!subscribeUntil || !paymentData.createdAt) return 0;
-
+    if (!subscribeUntil || !paymentData?.createdAt) return 0;
     const expiryDate = new Date(subscribeUntil);
-    const start = new Date(paymentData.createdAt); // Waktu saat ini
-
+    const start = new Date(paymentData.createdAt); 
     const diffTime = expiryDate - start;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
     return diffDays > 0 ? diffDays : 0;
+  };
+
+  const calculateTotal = () => {
+    const basePrice = financePlan.pricePerDay * daysCount;
+    if (daysCount >= 30) {
+      const discount = basePrice * 0.10;
+      return Math.round(basePrice - discount);
+    }
+    return basePrice;
   };
 
   return (
@@ -234,7 +259,6 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Tombol Edit Profil */}
               <button 
                 onClick={() => {
                   setEditName(userName);
@@ -277,7 +301,6 @@ export default function Dashboard() {
 
       <div className="max-w-6xl mx-auto px-6 mt-8">
         
-        {/* --- DRAFT & PAYMENT AREA (JIKA BELUM APPROVED / NON-ADMIN) --- */}
         {userRole !== "admin" && paymentStatus !== "approved" && (
           <div className="mb-8 space-y-6 max-w-2xl mx-auto">
             {paymentStatus === "pending" && (
@@ -307,7 +330,7 @@ export default function Dashboard() {
                 <div className="bg-white border-2 border-emerald-500 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
                   
                   <div className="bg-emerald-600 text-white text-[10px] font-black uppercase px-4 py-1.5 rounded-full w-fit mb-4 tracking-widest shadow-md">
-                    Otomatis Aktif Tanpa Scan QR WA
+                    {financePlan.activePromoText}
                   </div>
 
                   <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Keuangan AI Bot</h2>
@@ -315,15 +338,15 @@ export default function Dashboard() {
 
                   <div className="my-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-baseline justify-between">
                     <div>
-                      <span className="text-xs text-slate-400 line-through font-bold block">Rp {financePlan.oldPrice}/bln</span>
+                      <span className="text-xs text-slate-400 line-through font-bold block">Rp {financePlan.oldPrice}</span>
                       <p className="text-3xl font-black text-emerald-600">
-                        Rp {financePlan.priceMonthly.toLocaleString('id-ID')}
-                        <span className="text-xs text-slate-400 font-bold"> /bulan</span>
+                        Rp {Number(financePlan.pricePerDay).toLocaleString('id-ID')}
+                        <span className="text-xs text-slate-400 font-bold"> /hari</span>
                       </p>
                     </div>
                     <div className="text-right">
                       <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full uppercase">
-                        ~Rp 2.000 / hari
+                        Fleksibel Harian / Bulanan
                       </span>
                     </div>
                   </div>
@@ -339,21 +362,27 @@ export default function Dashboard() {
 
                   <div className="bg-slate-900 rounded-2xl p-6 text-white space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Durasi Berlangganan:</span>
+                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Durasi Berlangganan (Hari):</span>
                       <div className="flex items-center gap-3 bg-white/10 p-1.5 rounded-xl border border-white/10">
-                        <button onClick={() => setMonths(Math.max(1, months - 1))} className="w-8 h-8 hover:bg-white/10 rounded-lg flex items-center justify-center font-bold text-lg">-</button>
-                        <span className="font-black text-sm w-12 text-center">{months} Bln</span>
-                        <button onClick={() => setMonths(months + 1)} className="w-8 h-8 hover:bg-white/10 rounded-lg flex items-center justify-center font-bold text-lg">+</button>
+                        <button onClick={() => setDaysCount(Math.max(1, daysCount - 1))} className="w-8 h-8 hover:bg-white/10 rounded-lg flex items-center justify-center font-bold text-lg">-</button>
+                        <span className="font-black text-sm w-16 text-center">{daysCount} Hari</span>
+                        <button onClick={() => setDaysCount(daysCount + 1)} className="w-8 h-8 hover:bg-white/10 rounded-lg flex items-center justify-center font-bold text-lg">+</button>
                       </div>
                     </div>
 
+                    {daysCount >= 30 && (
+                      <div className="text-xs text-emerald-400 font-bold bg-emerald-500/10 p-2.5 rounded-xl text-center border border-emerald-500/20">
+                        🎉 Selamat! Otomatis mendapat diskon 10% karena berlangganan &ge; 30 hari.
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between pt-2 border-t border-white/10">
                       <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Total Investasi:</span>
-                      <span className="text-2xl font-black text-emerald-400">Rp {(financePlan.priceMonthly * months).toLocaleString('id-ID')}</span>
+                      <span className="text-2xl font-black text-emerald-400">Rp {calculateTotal().toLocaleString('id-ID')}</span>
                     </div>
 
                     <button 
-                      onClick={() => nav("/payment-proof", { state: { plan: financePlan, total: financePlan.priceMonthly * months, duration: months } })}
+                      onClick={() => nav("/payment-proof", { state: { plan: financePlan, total: calculateTotal(), duration: daysCount } })}
                       className="w-full bg-emerald-500 hover:bg-emerald-400 text-white py-4 rounded-xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-xl transition-all active:scale-95 mt-4"
                     >
                       Aktifkan Keuangan AI Sekarang <ArrowRight size={18} />
@@ -366,7 +395,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* --- A. USER SUDAH APPROVED --- */}
         {userRole !== "admin" && paymentStatus === "approved" && (
           <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in duration-700">
             <div className="bg-white border border-emerald-100 rounded-[2.5rem] p-10 shadow-xl shadow-emerald-500/5 relative overflow-hidden text-center">
@@ -386,7 +414,28 @@ export default function Dashboard() {
                 Nomor WA <strong className="text-slate-800 font-bold">{userPhone || userEmail}</strong> telah otomatis di-whitelist oleh sistem. Anda dapat langsung mengirim pesan catatan transaksi ke WhatsApp Bot.
               </p>
 
-              <div className="mt-8 p-6 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
+              {/* KOTAK INFORMASI NOMOR AI */}
+              <div className="mt-6 p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex items-center justify-between gap-4 text-left">
+                <div className="flex items-center gap-3">
+                  <div className="bg-emerald-600 text-white p-2.5 rounded-xl shadow-sm">
+                    <MessageCircle size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">Nomor WhatsApp Bot AI</p>
+                    <p className="text-base font-black text-slate-900 tracking-wide mt-0.5">0831-9684-5145</p>
+                  </div>
+                </div>
+                <a 
+                  href="https://wa.me/6283196845145" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md transition-all shrink-0 flex items-center gap-1.5"
+                >
+                  Chat Bot <ArrowRight size={14} />
+                </a>
+              </div>
+
+              <div className="mt-6 p-6 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status Akses</p>
                   <p className="text-sm font-black text-emerald-600 flex items-center gap-2 mt-0.5">
@@ -405,7 +454,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* --- B. KHUSUS ADMIN --- */}
         {userRole === "admin" && (
           <div className="space-y-8 animate-in fade-in duration-1000">
             <div className="bg-white border border-slate-200 rounded-[2.5rem] p-10 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden relative group max-w-2xl mx-auto">
@@ -492,7 +540,6 @@ export default function Dashboard() {
             </div>
 
             <form onSubmit={handleUpdateProfile} className="space-y-4">
-              {/* Jika bukan admin, bisa edit nama */}
               {userRole !== "admin" && (
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">Nama Lengkap</label>
@@ -507,7 +554,6 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Email (Admin & User bisa edit) */}
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">Alamat Email</label>
                 <input
@@ -520,7 +566,6 @@ export default function Dashboard() {
                 />
               </div>
 
-              {/* Jika bukan admin, bisa edit nomor WhatsApp */}
               {userRole !== "admin" && (
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1">Nomor WhatsApp (Whitelist)</label>
