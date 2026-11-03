@@ -51,8 +51,7 @@ module.exports = async function financeHandler(sock, user, m) {
         `• Ketik *rekap 14/10/2026* -> Tanggal tertentu\n\n` +
         `📋 *Perintah Lainnya:*\n` +
         `• *list* -> Lihat 5 transaksi terakhir\n` +
-        `• *hapus [nomor]* -> Hapus transaksi (Cth: *hapus 1*)\n` +
-        `• *url* atau *menu url* -> Ambil link web RekapPage\n\n` +
+        `• *hapus [nomor]* -> Hapus transaksi (Cth: *hapus 1*)\n\n` +
         `🌐 *Link Web RekapPage Unikmu:*\n${PUBLIC_REKAP_URL}`;
 
       await sock.sendMessage(jid, { text: helpMessage }, { quoted: msg });
@@ -108,7 +107,7 @@ module.exports = async function financeHandler(sock, user, m) {
 
       const txs = await FinancialTransaction.find({
         userId: user._id,
-        date: { $gte: startDate, $lte: endDate }
+        date: { $gte: startDate,$lte: endDate }
       }).sort({ date: -1 });
 
       let totalIncome = 0;
@@ -147,13 +146,9 @@ module.exports = async function financeHandler(sock, user, m) {
     }
 
     // ==========================================
-    // 3. FITUR GRAFIK, WEB, & MENU URL
+    // 3. FITUR GRAFIK & WEB
     // ==========================================
-    if ([
-      "grafik", "/grafik", "chart", "/chart", 
-      "web", "/web", "link", "/link", 
-      "url", "/url", "menu url", "/menu url"
-    ].includes(lowerText)) {
+    if (["grafik", "/grafik", "chart", "/chart", "web", "/web", "link", "/link"].includes(lowerText)) {
       const webMsg = 
         `🌐 *WEB DASHBOARD & GRAFIK KEUANGAN*\n\n` +
         `Halo *${userName}*! Silakan buka link web RekapPage milikmu untuk melihat grafik interaktif dan ringkasan lengkapnya di sini:\n\n` +
@@ -180,7 +175,7 @@ module.exports = async function financeHandler(sock, user, m) {
 
       let listText = `📋 *5 TRANSAKSI TERAKHIRMU (${userName}):*\n\n`;
       txs.forEach((tx, index) => {
-        const sign = tx.type === "INCOME" ? "+" : "-";
+        const sign = tx.type === "INCOME" ? "🟢 +" : "🔴 -";
         const dateStr = new Date(tx.date).toLocaleDateString("id-ID");
         const itemName = tx.items[0]?.name || tx.vendor || "Transaksi";
         listText += `*${index + 1}.* ${dateStr} | *${itemName}* (${sign}Rp ${tx.totalAmount.toLocaleString("id-ID")})\n`;
@@ -207,7 +202,7 @@ module.exports = async function financeHandler(sock, user, m) {
       const txs = await FinancialTransaction.find({ userId: user._id }).sort({ date: -1 }).limit(5);
 
       if (indexNum > txs.length) {
-        await sock.sendMessage(jid, { text: `Waduh, transaksi nomor *${indexNum}* gak ketemu nih di 5 catatan terakhirmu, *${userName}*.` }, { quoted: msg });
+        await sock.sendMessage(jid, { text: `Waduh, transaksi nomor *${indexNum}* gak ketemu nih di 5 catatan terakhirmu *${userName}*.` }, { quoted: msg });
         return true;
       }
 
@@ -216,7 +211,7 @@ module.exports = async function financeHandler(sock, user, m) {
 
       const deletedName = targetTx.items[0]?.name || targetTx.vendor || "Transaksi";
       await sock.sendMessage(jid, { 
-        text: `🗑️ Siap *${userName}*, transaksi nomor *${indexNum}* (${deletedName} - Rp ${targetTx.totalAmount.toLocaleString("id-ID")}) berhasil dihapus!\n\n` +
+        text: `🗑️ Siap *${userName}*, transaksi nomor *${indexNum}* (*${deletedName}* - Rp ${targetTx.totalAmount.toLocaleString("id-ID")}) berhasil dihapus!\n\n` +
               `🌐 Web Rekap: ${PUBLIC_REKAP_URL}` 
       }, { quoted: msg });
       return true;
