@@ -35,17 +35,24 @@ OUTPUT WAJIB JSON VALID (tanpa teks di luar JSON):
         type: "image_url",
         image_url: {
           url: `data:image/jpeg;base64,${imageBase64.replace(/^data:image\/\w+;base64,/, "")}`,
-          detail: "low" // Gunakan low agar hemat, ganti "high" jika struk sangat panjang & tulisannya kecil
+          detail: "low"
         }
       });
     }
 
     if (userContent.length === 0) return { isFinancialData: false };
 
-    // Menyusun array messages dengan menyertakan historyContext (jika ada)
+    // Sanitasi historyContext: Pastikan setiap elemen valid berupa objek { role, content }
+    const sanitizedHistory = Array.isArray(historyContext) 
+      ? historyContext
+          .filter(h => h && typeof h === 'object' && h.role && h.content)
+          .map(h => ({ role: h.role, content: h.content }))
+      : [];
+
+    // Menyusun array messages dengan aman
     const messages = [
       { role: "system", content: systemPrompt },
-      ...historyContext, // Memasukkan riwayat chat sebelumnya agar AI nyambung diajak ngobrol
+      ...sanitizedHistory, // Memasukkan riwayat chat yang sudah dibersihkan
       { role: "user", content: userContent }
     ];
 
@@ -58,7 +65,7 @@ OUTPUT WAJIB JSON VALID (tanpa teks di luar JSON):
       body: JSON.stringify({
         model: OPENROUTER_MODEL,
         messages: messages,
-        temperature: 0.2, // Dinaikkan sedikit dari 0 agar AI lebih luwes & tidak kaku
+        temperature: 0.2,
         response_format: { type: "json_object" }
       })
     });
