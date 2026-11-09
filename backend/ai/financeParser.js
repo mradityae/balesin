@@ -5,46 +5,49 @@ const OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions";
 const parseFinanceWithAI = async (text, imageBase64 = null, historyContext = []) => {
   const today = new Date().toISOString().split("T")[0];
 
-  const systemPrompt = `Anda adalah parser keuangan pintar untuk catat transaksi harian dari CHAT atau STRUK FOTO.
+  const systemPrompt = `Kamu adalah asisten keuangan pribadi yang sangat cerdas, santai, dan paham bahasa gaul/sehari-hari Indonesia (termasuk singkatan, typo ringan, dan bahasa tidak formal). Tugasmu mengekstrak transaksi keuangan dari chat atau foto struk.
 
-ATURAN PARSING:
+PANDUAN PEMAHAMAN KONTEKS:
 1. TIPE TRANSAKSI (type):
-   - "INCOME": Jika ada konteks pemasukan, gaji, hasil jual, omzet, dapat duit, atau dari foto struk penjualan.
-   - "EXPENSE": Jika ada konteks pengeluaran, beli, bayar, cilok, bensin, makan, sewa, atau foto struk belanja/pembelian.
-2. KONVERSI NOMINAL:
-   - "10 rb" / "10 ribu" / "10k" -> 10000
-   - "5 jt" / "5 juta" -> 5000000
-   - "5000.000" / "5.000.000" -> 5000000
-3. JIKA DARI GAMBAR/STRUK:
-   - Ekstrak total bayar, nama vendor/toko, dan item jika terlihat jelas.
-4. JIKA BUKAN TRANSAKSI: Set "isFinancialData": false.
+   - "INCOME": Pemasukan, gaji, ketiban rezeki, hasil jualan, omzet, ditransfer orang, nemu duit, dll.
+   - "EXPENSE": Pengeluaran, beli barang, bayar-bayar, ngopi, makan, jajan, bensin, ongkos, sewa, dll.
+2. NOMINAL FLEKSIBEL: Pahami berbagai format angka seperti "10rb", "10 k", "50 cicil", "5jt", "setengah juta" (500000), "ceban" (10000), "gocap" (50000), titik/koma desimal khas Indonesia.
+3. JIKA INPUT TIDAK JELAS/BUKAN TRANSAKSI (misal: "halo", "lagi apa?", "terima kasih"): Set "isFinancialData": false dan berikan respons sapaan/bantuan yang ramah di "insight".
+4. JIKA DARI GAMBAR/STRUK: Ekstrak total, nama toko/vendor, dan rincian item dengan teliti meskipun layout struk berantakan.
 
-OUTPUT HARUS JSON VALID:
+OUTPUT WAJIB JSON VALID (tanpa teks di luar JSON):
 {
   "isFinancialData": true,
   "date": "${today}",
   "type": "INCOME" | "EXPENSE",
-  "vendor": "Nama vendor/toko/kategori",
+  "vendor": "Nama toko/tempat/kategori umum jika tidak ada nama toko",
   "items": [{"name": "string", "qty": 1, "price": 0, "subtotal": 0}],
   "total": 0,
-  "insight": "catatan ringkas"
+  "insight": "catatan ringkas atau sapaan jika bukan transaksi"
 }`;
 
   try {
     const userContent = [];
-    if (text) userContent.push({ type: "text", text: `Input: ${text}` });
+    if (text) userContent.push({ type: "text", text: `Input user: ${text}` });
     
     if (imageBase64) {
       userContent.push({
         type: "image_url",
         image_url: {
           url: `data:image/jpeg;base64,${imageBase64.replace(/^data:image\/\w+;base64,/, "")}`,
-          detail: "high"
+          detail: "low" // Gunakan low agar hemat, ganti "high" jika struk sangat panjang & tulisannya kecil
         }
       });
     }
 
     if (userContent.length === 0) return { isFinancialData: false };
+
+    // Menyusun array messages dengan menyertakan historyContext (jika ada)
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...historyContext, // Memasukkan riwayat chat sebelumnya agar AI nyambung diajak ngobrol
+      { role: "user", content: userContent }
+    ];
 
     const res = await fetch(OPENROUTER_API, {
       method: "POST",
@@ -54,11 +57,8 @@ OUTPUT HARUS JSON VALID:
       },
       body: JSON.stringify({
         model: OPENROUTER_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent }
-        ],
-        temperature: 0,
+        messages: messages,
+        temperature: 0.2, // Dinaikkan sedikit dari 0 agar AI lebih luwes & tidak kaku
         response_format: { type: "json_object" }
       })
     });
