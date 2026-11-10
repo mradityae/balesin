@@ -31,7 +31,9 @@ exports.getUserById = async (req, res) => {
 exports.activateSubscription = async (req, res) => {
   const { userId, days } = req.body;
 
-  const until = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  // const until = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+  const until = new Date(Date.now() + days);
 
   await User.findByIdAndUpdate(userId, {
     subscribedUntil: until,
