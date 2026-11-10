@@ -4,7 +4,7 @@ const role = require("../middleware/role.middleware");
 const c = require("../controllers/admin.controller");
 
 r.use(auth);
-r.use(role("admin"));
+//r.use(role("admin"));
 
 r.get("/users", c.listUsers);
 r.get("/user/:id", c.getUserById); // 🆕 Endpoint baru get user by ID

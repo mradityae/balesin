@@ -63,6 +63,8 @@ exports.login = async (req, res) => {
     { expiresIn: "7d" }
   );
 
+  console.log(user.subscribedUntil);
+
   res.json({ token });
 };
 

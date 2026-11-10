@@ -5,7 +5,7 @@ const { sendWhatsAppMessage } = require("../src/utils/whatsappSender");
 // Upload bukti
 exports.uploadProof = async (req, res) => {
   try {
-    const userId = req.user?.id || req.body.userId;
+    const userId = req.user?.uid || req.user?.id;
     
     const { 
       planName, 
@@ -45,7 +45,9 @@ exports.uploadProof = async (req, res) => {
 // Status bukti user
 exports.getStatus = async (req, res) => {
   try {
-    const userId = req.user.uid || req.user.id;
+    const userId = req.user?.uid || req.user?.id;
+    if (!userId) return res.status(401).json({ error: "User tidak valid" });
+
     const proof = await PaymentProof.findOne({ userId });
 
     if (!proof) return res.json({ active: false, status: "not_found" });
@@ -72,7 +74,8 @@ exports.getAll = async (req, res) => {
       .populate("userId", "name email phone role")
       .sort({ createdAt: -1 });
     res.json(list);
-  } catch {
+  } catch (err) {
+    console.error("Error getAll:", err);
     res.status(500).json({ error: "Gagal memuat list" });
   }
 };

@@ -228,7 +228,7 @@ export default function Admin() {
     if (note === undefined) return;
     try {
       await api.post(`/payment-proof/approve/${user.proofId}`, { note });
-      await api.post("/admin/activate-subscription", { userId: user._id, days: user.duration * 30 });
+      await api.post("/admin/activate-subscription", { userId: user._id, days: user.duration });
       Swal.fire("Berhasil", "Pembayaran disetujui & Subscription aktif", "success");
       loadUsersData();
     } catch { Swal.fire("Error", "Gagal menyetujui", "error"); }

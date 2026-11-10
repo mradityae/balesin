@@ -1,20 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import api from "../services/api";
 import Swal from "sweetalert2";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getToken } from "../utils/auth";
 import { jwtDecode } from "jwt-decode";
+import qrCodeImage from "../assets/qr-code.jpeg";
 import { 
   ArrowLeft, 
   UploadCloud, 
   Image as ImageIcon, 
   CheckCircle2, 
-  ShieldCheck, 
-  AlertCircle,
   Loader2,
-  Wallet,
-  Calendar,
-  CreditCard
+  Wallet
 } from "lucide-react";
 
 const StyledSwal = Swal.mixin({
@@ -32,11 +29,17 @@ export default function PaymentProof() {
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const topRef = useRef(null);
   const nav = useNavigate();
   const location = useLocation();
   
   // Ambil data kiriman dari Dashboard
   const { plan, total, duration } = location.state || {};
+
+  // Auto scroll ke paling atas saat halaman dimuat agar nominal terlihat
+  useEffect(() => {
+    topRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
   const handleFile = (e) => {
     const f = e.target.files[0];
@@ -67,13 +70,11 @@ export default function PaymentProof() {
       fd.append("userId", decoded.uid);
       fd.append("image", file);
 
-      // 2. Data Tambahan Paket & Pembayaran (Data yang Anda minta)
+      // 2. Data Tambahan Paket & Pembayaran
       fd.append("planName", plan?.name || "Regular");
       fd.append("duration", duration || 1);
       fd.append("totalPaid", total || 0);
-      fd.append("bankDestination", "Mandiri");
-      fd.append("accountNumber", "1300017311542");
-      fd.append("accountName", "Muhammad Raditya Ernawan");
+      fd.append("paymentMethod", "QRIS balaskan.id");
 
       await api.post("/payment-proof/upload", fd, {
         headers: {
@@ -104,7 +105,7 @@ export default function PaymentProof() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center py-12 px-6 font-sans selection:bg-blue-100 pb-24">
+    <div ref={topRef} className="min-h-screen bg-[#F8FAFC] flex flex-col items-center py-12 px-6 font-sans selection:bg-blue-100 pb-24">
       
       {/* BACK BUTTON */}
       <div className="w-full max-w-xl mb-8">
@@ -149,33 +150,21 @@ export default function PaymentProof() {
 
                  <div className="flex items-center justify-between pt-2">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Harus Dibayar</p>
-                    <p className="text-2xl font-black text-blue-400">Rp {total.toLocaleString('id-ID')}</p>
+                    <p className="text-2xl font-black text-blue-400">Rp {total ? total.toLocaleString('id-ID') : 0}</p>
                  </div>
                </div>
              </div>
           </div>
         )}
 
-        {/* BANK TRANSFER INFO */}
-        <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="bg-blue-50 p-3 rounded-2xl text-blue-600"><CreditCard size={24}/></div>
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tujuan Transfer</p>
-              <p className="font-black text-slate-800 tracking-tight">Bank Mandiri (IDR)</p>
-            </div>
-          </div>
-
-          <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100">
-            <div className="mb-4">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Nomor Rekening</p>
-              <p className="text-xl font-black text-slate-800 tracking-[0.1em]">1300017311542</p>
-            </div>
-            <div>
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Atas Nama</p>
-              <p className="font-bold text-slate-700">Muhammad Raditya Ernawan</p>
-            </div>
-          </div>
+        {/* QRIS / QR CODE (Ngejeblag Besar Tanpa Bingkai) */}
+        <div className="flex flex-col items-center text-center py-4">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Scan QRIS di bawah ini untuk membayar</p>
+          <img 
+            src={qrCodeImage} 
+            alt="QR Code balaskan.id" 
+            className="w-full max-w-sm h-auto object-contain rounded-3xl shadow-2xl bg-white p-2"
+          />
         </div>
 
         {/* UPLOAD AREA */}

@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [userRole, setUserRole] = useState("");
   const [userPhone, setUserPhone] = useState("");
   const [subscribeUntil, setSubscribeUntil] = useState("");
+  const [isExpiringSoon, setIsExpiringSoon] = useState(false);
   const [loading, setLoading] = useState(false);
   const [qrLoading, setQrLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -92,27 +93,79 @@ export default function Dashboard() {
     }
   };
 
-  const loadUserData = () => {
+  const calculateTotal = () => {
+    const basePrice = financePlan.pricePerDay * daysCount;
+    if (daysCount >= 30) {
+      const discount = basePrice * 0.10;
+      return Math.round(basePrice - discount);
+    }
+    return basePrice;
+  };
+
+  const loadUserData = async () => {
     const token = getToken();
     if (!token) { nav("/login"); return; }
     try {
-      const data = jwtDecode(token);
-      const nameVal = data.name || data.nama || "";
-      const emailVal = data.email || "";
-      const phoneVal = data.phone || "";
-      const roleVal = data.role || "";
-      const subscribedUntilVal = data.subscribedUntil || "";
+      const decoded = jwtDecode(token);
+      console.log("decoded token: ", decoded);
+      
+      const userId = decoded.uid || decoded.id;
+      const roleVal = decoded.role || "";
+      setUserRole(roleVal);
+
+      let subscribedUntilVal = decoded.subscribedUntil || "";
+      let nameVal = decoded.name || decoded.nama || "";
+      let emailVal = decoded.email || "";
+      let phoneVal = decoded.phone || "";
+
+      if (userId) {
+        try {
+          const res = await api.get(`/admin/user/${userId}`);
+          const userData = res.data?.user || res.data;
+          
+          nameVal = userData.name || userData.nama || nameVal;
+          emailVal = userData.email || emailVal;
+          phoneVal = userData.phone || phoneVal;
+          subscribedUntilVal = userData.subscribedUntil || userData.subscribeUntil || subscribedUntilVal;
+        } catch (apiErr) {
+          console.log("Gagal fetch dari API user ID, fallback ke token decode:", apiErr);
+        }
+      }
 
       setUserEmail(emailVal);
       setUserName(nameVal);
-      setUserRole(roleVal);
       setUserPhone(phoneVal);
       setSubscribeUntil(subscribedUntilVal);
 
       setEditName(nameVal);
       setEditEmail(emailVal);
       setEditPhone(phoneVal);
-    } catch { nav("/login"); }
+
+      // --- CEK APAKAH SISA WAKTU KURANG DARI 12 JAM & NOTIFIKASI ---
+      if (roleVal !== "admin" && subscribedUntilVal) {
+        const now = new Date();
+        const expiryDate = new Date(subscribedUntilVal);
+        const diffMs = expiryDate - now;
+        const twelveHoursInMs = 12 * 60 * 60 * 1000;
+
+        if (diffMs > 0 && diffMs <= twelveHoursInMs) {
+          setIsExpiringSoon(true);
+          const hoursLeft = Math.ceil(diffMs / (1000 * 60 * 60));
+          Swal.fire({
+            icon: "warning",
+            title: "Masa Aktif Segera Habis!",
+            text: `Langganan Keuangan AI Anda akan berakhir dalam kurang lebih ${hoursLeft} jam lagi. Silakan lakukan perpanjangan pada menu di bawah.`,
+            confirmButtonText: "Baiklah",
+            confirmButtonColor: "#059669"
+          });
+        } else {
+          setIsExpiringSoon(false);
+        }
+      }
+
+    } catch { 
+      nav("/login"); 
+    }
   };
 
   useEffect(() => {
@@ -209,21 +262,16 @@ export default function Dashboard() {
   };
 
   const getRemainingDays = () => {
-    if (!subscribeUntil || !paymentData?.createdAt) return 0;
+    if (!subscribeUntil) return 0;
+    
+    const now = new Date();
     const expiryDate = new Date(subscribeUntil);
-    const start = new Date(paymentData.createdAt); 
-    const diffTime = expiryDate - start;
+    const diffTime = expiryDate - now;
+    
+    if (diffTime <= 0) return 0;
+    
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
-  };
-
-  const calculateTotal = () => {
-    const basePrice = financePlan.pricePerDay * daysCount;
-    if (daysCount >= 30) {
-      const discount = basePrice * 0.10;
-      return Math.round(basePrice - discount);
-    }
-    return basePrice;
   };
 
   return (
@@ -435,21 +483,56 @@ export default function Dashboard() {
                 </a>
               </div>
 
-              <div className="mt-6 p-6 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status Akses</p>
-                  <p className="text-sm font-black text-emerald-600 flex items-center gap-2 mt-0.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                    TERHUBUNG OTOMATIS
-                  </p>
+              {/* KELOLA LAPORAN & TOMBOL PERPANJANG HANYA MUNCUL JIKA < 12 JAM */}
+              <div className="mt-6 p-6 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-4 text-left">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status Akses</p>
+                    <p className="text-sm font-black text-emerald-600 flex items-center gap-2 mt-0.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                      TERHUBUNG OTOMATIS
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => nav("/finance")}
+                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 transition-all active:scale-95"
+                  >
+                    <Zap size={16} /> Kelola Laporan
+                  </button>
                 </div>
-                <button
-                  onClick={() => nav("/finance")}
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 transition-all active:scale-95"
-                >
-                  <Zap size={16} /> Kelola Laporan Finance
-                </button>
+
+                {/* Bagian Perpanjangan (Aktif hanya jika sisa waktu <= 12 jam) */}
+                {isExpiringSoon && (
+                  <div className="pt-4 border-t border-amber-200 bg-amber-50/50 -mx-6 -mb-6 p-6 rounded-b-2xl animate-in fade-in duration-500">
+                    <div className="flex items-center gap-2 mb-3 text-amber-800 text-xs font-bold">
+                      <AlertCircle size={16} className="text-amber-600 shrink-0" />
+                      <span>Masa aktif segera berakhir. Silakan lakukan perpanjangan durasi:</span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="w-full sm:w-auto">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Durasi Perpanjangan:</span>
+                        <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 w-fit">
+                          <button onClick={() => setDaysCount(Math.max(1, daysCount - 1))} className="w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center font-bold text-sm">-</button>
+                          <span className="font-black text-xs w-16 text-center text-slate-800">{daysCount} Hari</span>
+                          <button onClick={() => setDaysCount(daysCount + 1)} className="w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center font-bold text-sm">+</button>
+                        </div>
+                      </div>
+
+                      <div className="w-full sm:w-auto text-right">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Total: Rp {calculateTotal().toLocaleString('id-ID')}</span>
+                        <button
+                          onClick={() => nav("/payment-proof", { state: { plan: financePlan, total: calculateTotal(), duration: daysCount } })}
+                          className="mt-1 w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-amber-100 transition-all active:scale-95"
+                        >
+                          <Clock size={16} /> Perpanjang Sekarang
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+
             </div>
           </div>
         )}
