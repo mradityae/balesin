@@ -78,7 +78,7 @@ export default function AdminPaymentProof() {
         await api.post(`/payment-proof/approve/${proof._id}`, { note });
         await api.post("/admin/activate-subscription", {
           userId: proof.userId?._id,
-          days: proof.duration * 30,
+          days: proof.duration,
         });
         Swal.fire("Berhasil", "Subscription aktif!", "success");
         load();
