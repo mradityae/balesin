@@ -202,6 +202,7 @@ export default function Dashboard() {
     loadPayment();
 
     const interval = setInterval(() => {
+      loadUserData();
       loadPayment();
       if (userRole === "admin" && !bot?.connected) {
         load();
