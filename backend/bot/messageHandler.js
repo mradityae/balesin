@@ -43,6 +43,7 @@ module.exports = async function handleMessage(sock, hostUser, m) {
   const msg = m.messages?.[0];
   if (!msg || msg.key.fromMe) return;
 
+  const jid = msg.key.remoteJidAlt || msg.key.remoteJid;
   const rawSenderPhone = getSenderPhone(msg);
 
   if (!rawSenderPhone) {
@@ -56,7 +57,6 @@ module.exports = async function handleMessage(sock, hostUser, m) {
   /* =====================================================
      1️⃣ CARI USER DI DATABASE YANG NOMOR HP-NYA COCOK DENGAN PENGIRIM CHAT
   ===================================================== */
-  // Ambil semua user aktif dari database (sehingga jika ada perubahan nomor di DB, langsung terbaca real-time)
   const activeUsers = await User.find({ isActive: true });
 
   let matchedUser = null;
@@ -70,9 +70,11 @@ module.exports = async function handleMessage(sock, hostUser, m) {
     }
   }
 
-  // Jika nomor pengirim chat TIDAK ADA di database (bukan whitelist), diam total!
+  // Jika nomor pengirim chat TIDAK ADA di database (bukan whitelist), balas dan arahkan daftar
   if (!matchedUser) {
     console.log(`⛔ Sender phone (${senderPhone}) is not whitelisted in users table.`);
+    const unsubscribedMsg = `Halo! 👋 Nomor WhatsApp kamu belum terdaftar di BalesinAI.\n\nSilahkan daftar ke https://balesin-ai.netlify.app`;
+    await sock.sendMessage(jid, { text: unsubscribedMsg }, { quoted: msg });
     return; 
   }
 
@@ -84,9 +86,11 @@ module.exports = async function handleMessage(sock, hostUser, m) {
     status: "approved",
   });
 
-  // Jika user ini belum bayar dan bukan admin, diam total
+  // Jika user ini belum bayar dan bukan admin, balas dan arahkan daftar/berlangganan
   if (!pay && matchedUser.role !== 'admin') {
     console.log(`⛔ User ${matchedUser.email} has no active subscription.`);
+    const unsubscribedMsg = `Halo *${matchedUser.name || "Kak"}*! 👋 Masa berlangganan kamu belum aktif atau belum membayar.\n\nSilahkan daftar ke https://balesin-ai.netlify.app`;
+    await sock.sendMessage(jid, { text: unsubscribedMsg }, { quoted: msg });
     return; 
   }
 
