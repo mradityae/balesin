@@ -17,13 +17,24 @@ module.exports = async function financeHandler(sock, user, m) {
   const hasImage = !!msg.message?.imageMessage;
   const lowerText = text.toLowerCase();
 
+  // ==========================================
+  // CEK SUBSCRIPTION / MASA BERLAKU BERLANGGANAN
+  // ==========================================
+  const now = new Date();
+  const isSubscribed = user?.subscribedUntil && new Date(user.subscribedUntil) > now;
+  
+  if (!isSubscribed) {
+    const unsubscribedMsg = `Halo! 👋 Masa berlangganan kamu belum aktif atau sudah berakhir.\n\nSilahkan daftar ke https://balesin-ai.netlify.app`;
+    await sock.sendMessage(jid, { text: unsubscribedMsg }, { quoted: msg });
+    return true;
+  }
+
   // Ambil nama pengguna
   const userName = user?.name || user?.nama || user?.email || "Kak";
 
   // Pastikan user punya shareToken unik untuk RekapPage
   let dbUser = await User.findById(user._id);
   if (dbUser && !dbUser.shareToken) {
-    const crypto = require("crypto");
     dbUser.shareToken = crypto.randomBytes(8).toString("hex");
     await dbUser.save();
   }
@@ -88,7 +99,6 @@ module.exports = async function financeHandler(sock, user, m) {
         endDate.setHours(23, 59, 59, 999);
         titleLabel = "BULAN INI";
       } else if (param.length > 0) {
-        // Parsing tanggal kustom (misal: 14/10/2026 atau 2026-10-14)
         const parsedDate = new Date(param);
         if (!isNaN(parsedDate.getTime())) {
           startDate = new Date(parsedDate);
@@ -107,7 +117,7 @@ module.exports = async function financeHandler(sock, user, m) {
 
       const txs = await FinancialTransaction.find({
         userId: user._id,
-        date: { $gte: startDate,$lte: endDate }
+        date: { $gte: startDate, $lte: endDate }
       }).sort({ date: -1 });
 
       let totalIncome = 0;
@@ -211,7 +221,7 @@ module.exports = async function financeHandler(sock, user, m) {
 
       const deletedName = targetTx.items[0]?.name || targetTx.vendor || "Transaksi";
       await sock.sendMessage(jid, { 
-        text: `🗑️ Siap *${userName}*, transaksi nomor *${indexNum}* (*${deletedName}* - Rp ${targetTx.totalAmount.toLocaleString("id-ID")}) berhasil dihapus!\n\n` +
+        text: `🗑️ Siap *${userName}*, transaksi nomor *${indexNum}* (${deletedName} - Rp ${targetTx.totalAmount.toLocaleString("id-ID")}) berhasil dihapus!\n\n` +
               `🌐 Web Rekap: ${PUBLIC_REKAP_URL}` 
       }, { quoted: msg });
       return true;
