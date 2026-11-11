@@ -30,9 +30,11 @@ exports.getUserById = async (req, res) => {
 
 exports.activateSubscription = async (req, res) => {
   const { userId, days } = req.body;
-
   // Konversi hari ke milidetik (days * 24 jam * 60 menit * 60 detik * 1000 ms)
   const sampaidengan = new Date(Date.now() + Number(days) * 24 * 60 * 60 * 1000);
+
+  console.log('days : ',days);
+  console.log("sampaidengan : ",sampaidengan);  
 
   await User.findByIdAndUpdate(userId, {
     subscribedUntil: sampaidengan,
