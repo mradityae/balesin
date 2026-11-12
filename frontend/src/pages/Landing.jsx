@@ -166,7 +166,7 @@ export default function Landing() {
                   </div>
                   <div className="sm:text-right">
                     <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-full uppercase tracking-wider inline-block">
-                      Total per bulan (x 30 hari): Rp {calculatedMonthlyPrice.toLocaleString('id-ID')}
+                      Total per bulan : Rp {calculatedMonthlyPrice.toLocaleString('id-ID')}
                     </span>
                   </div>
                 </div>

@@ -51,7 +51,17 @@ export default function Dashboard() {
     ]
   });
 
-  const [daysCount, setDaysCount] = useState(1);
+  // Durasi dipilih dalam hari atau bulan, tetapi nilai yang dikirim ke backend tetap hari.
+  const [durationValue, setDurationValue] = useState(1);
+  const [durationUnit, setDurationUnit] = useState("day");
+
+  // Konversi dilakukan di frontend: 1 bulan = 30 hari.
+  const daysCount = durationValue * (durationUnit === "month" ? 30 : 1);
+  const durationLabel = durationUnit === "month" ? "Bulan" : "Hari";
+
+  const adjustDuration = (amount) => {
+    setDurationValue((current) => Math.max(1, current + amount));
+  };
 
   const qrRef = useRef(null);
   const topRef = useRef(null);
@@ -94,6 +104,7 @@ export default function Dashboard() {
   };
 
   const calculateTotal = () => {
+    // Harga dan payload pembayaran selalu dihitung berdasarkan jumlah hari hasil konversi.
     const basePrice = financePlan.pricePerDay * daysCount;
     if (daysCount >= 30) {
       const discount = basePrice * 0.10;
@@ -408,13 +419,26 @@ export default function Dashboard() {
                   </ul>
 
                   <div className="bg-slate-900 rounded-2xl p-6 text-white space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Durasi Berlangganan (Hari):</span>
-                      <div className="flex items-center gap-3 bg-white/10 p-1.5 rounded-xl border border-white/10">
-                        <button onClick={() => setDaysCount(Math.max(1, daysCount - 1))} className="w-8 h-8 hover:bg-white/10 rounded-lg flex items-center justify-center font-bold text-lg">-</button>
-                        <span className="font-black text-sm w-16 text-center">{daysCount} Hari</span>
-                        <button onClick={() => setDaysCount(daysCount + 1)} className="w-8 h-8 hover:bg-white/10 rounded-lg flex items-center justify-center font-bold text-lg">+</button>
+                    <div className="space-y-3">
+                      <span className="block text-xs font-black text-slate-400 uppercase tracking-widest">Durasi Berlangganan:</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <select
+                          value={durationUnit}
+                          onChange={(e) => setDurationUnit(e.target.value)}
+                          className="w-full sm:w-32 bg-white/10 text-white border border-white/20 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-emerald-400 [&>option]:text-slate-900"
+                        >
+                          <option value="day">Hari</option>
+                          <option value="month">Bulan</option>
+                        </select>
+                        <div className="flex items-center gap-3 bg-white/10 p-1.5 rounded-xl border border-white/10 w-fit">
+                          <button onClick={() => adjustDuration(-1)} className="w-8 h-8 hover:bg-white/10 rounded-lg flex items-center justify-center font-bold text-lg">-</button>
+                          <span className="font-black text-sm min-w-20 text-center">{durationValue} {durationLabel}</span>
+                          <button onClick={() => adjustDuration(1)} className="w-8 h-8 hover:bg-white/10 rounded-lg flex items-center justify-center font-bold text-lg">+</button>
+                        </div>
                       </div>
+                      {durationUnit === "month" && (
+                        <p className="text-[11px] text-slate-400">Setara dengan {daysCount} hari (1 bulan = 30 hari).</p>
+                      )}
                     </div>
 
                     {daysCount >= 30 && (
@@ -511,10 +535,21 @@ export default function Dashboard() {
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                       <div className="w-full sm:w-auto">
                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Durasi Perpanjangan:</span>
-                        <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 w-fit">
-                          <button onClick={() => setDaysCount(Math.max(1, daysCount - 1))} className="w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center font-bold text-sm">-</button>
-                          <span className="font-black text-xs w-16 text-center text-slate-800">{daysCount} Hari</span>
-                          <button onClick={() => setDaysCount(daysCount + 1)} className="w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center font-bold text-sm">+</button>
+                        <div className="flex flex-col gap-2">
+                          <select
+                            value={durationUnit}
+                            onChange={(e) => setDurationUnit(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500"
+                          >
+                            <option value="day">Hari</option>
+                            <option value="month">Bulan</option>
+                          </select>
+                          <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 w-fit">
+                            <button onClick={() => adjustDuration(-1)} className="w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center font-bold text-sm">-</button>
+                            <span className="font-black text-xs min-w-16 text-center text-slate-800">{durationValue} {durationLabel}</span>
+                            <button onClick={() => adjustDuration(1)} className="w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center font-bold text-sm">+</button>
+                          </div>
+                          {durationUnit === "month" && <p className="text-[10px] text-slate-500">Setara {daysCount} hari (1 bulan = 30 hari).</p>}
                         </div>
                       </div>
 
