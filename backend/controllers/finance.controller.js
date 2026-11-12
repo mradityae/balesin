@@ -159,3 +159,45 @@ exports.getPublicSummaryByToken = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
+exports.updateTransaction = async (req, res) => {
+  try {
+    const transactionId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(transactionId)) {
+      return res.status(400).json({ success: false, message: "Format ID transaksi tidak valid" });
+    }
+
+    // Ambil data yang dikirim dari body request
+    const { date, type, vendor, items, totalAmount, source, rawText } = req.body;
+
+    // Siapkan objek update (hanya memperbarui field yang dikirim)
+    const updateData = {};
+    if (date !== undefined) updateData.date = date;
+    if (type !== undefined) updateData.type = type;
+    if (vendor !== undefined) updateData.vendor = vendor;
+    if (items !== undefined) updateData.items = items;
+    if (totalAmount !== undefined) updateData.totalAmount = totalAmount;
+    if (source !== undefined) updateData.source = source;
+    if (rawText !== undefined) updateData.rawText = rawText;
+
+    const updatedTransaction = await FinancialTransaction.findByIdAndUpdate(
+      transactionId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedTransaction) {
+      return res.status(404).json({ success: false, message: "Transaksi tidak ditemukan" });
+    }
+
+    res.json({
+      success: true,
+      message: "Transaksi berhasil diperbarui",
+      transaction: updatedTransaction
+    });
+  } catch (err) {
+    console.error("updateTransaction Error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};

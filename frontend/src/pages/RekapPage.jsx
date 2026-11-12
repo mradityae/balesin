@@ -120,7 +120,7 @@ export default function RekapPage() {
     });
   };
 
-  // Fungsi Edit Transaksi
+  // Fungsi Edit Transaksi (PUT /api/finance/:id)
   const handleEdit = async (tx) => {
     const currentName = tx.items?.[0]?.name || tx.rawText || "";
     const currentDate = tx.date ? tx.date.split("T")[0] : "";
@@ -166,7 +166,6 @@ export default function RekapPage() {
 
     if (formValues) {
       try {
-        // Menyesuaikan payload dengan struktur backend Anda (misal items array atau field langsung)
         const payload = {
           totalAmount: formValues.totalAmount,
           type: formValues.type,
@@ -187,6 +186,7 @@ export default function RekapPage() {
     }
   };
 
+  // Fungsi Hapus Transaksi (DELETE /api/finance/:id)
   const handleDelete = async (id, itemName) => {
     const confirm = await Swal.fire({
       title: "Hapus Transaksi?",
@@ -201,7 +201,8 @@ export default function RekapPage() {
     if (confirm.isConfirmed) {
       try {
         const res = await api.delete(`/finance/${id}`);
-        if (res.data.success) {
+        if (res.data.success || res.status === 200) {
+          Swal.fire({ icon: "success", title: "Terhapus", text: "Transaksi berhasil dihapus.", timer: 1500, showConfirmButton: false });
           fetchRekapData();
         }
       } catch (err) {
