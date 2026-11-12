@@ -5,10 +5,23 @@ const pay = require("../models/PaymentProof");
 const { clearSession } = require("../bot/sessionManager");
 
 exports.start = async (req, res) => {
-  const user = await User.findById(req.user.uid);
-  await BotManager.start(user);
-  await Bot.findOneAndUpdate({ uid: user._id }, {}, { upsert: true });
-  res.json({ success: true });
+  try {
+    const user = await User.findById(req.user.uid);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User tidak ditemukan" });
+    }
+
+    await BotManager.start(user);
+    await Bot.findOneAndUpdate({ uid: user._id }, { status: 'STARTING' }, { upsert: true });
+
+    return res.json({ 
+      success: true, 
+      message: "Perintah start bot dikirim",
+    });
+  } catch (err) {
+    console.error("Gagal start bot:", err);
+    return res.status(500).json({ success: false, message: "Gagal memulai engine bot" });
+  }
 };
 
 exports.status = async (req, res) => {
