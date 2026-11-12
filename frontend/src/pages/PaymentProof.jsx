@@ -11,7 +11,8 @@ import {
   Image as ImageIcon, 
   CheckCircle2, 
   Loader2,
-  Wallet
+  Wallet,
+  HelpCircle
 } from "lucide-react";
 
 const StyledSwal = Swal.mixin({
@@ -157,14 +158,42 @@ export default function PaymentProof() {
           </div>
         )}
 
-        {/* QRIS / QR CODE (Ngejeblag Besar Tanpa Bingkai) */}
-        <div className="flex flex-col items-center text-center py-4">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Scan QRIS di bawah ini untuk membayar</p>
+        {/* QRIS / QR CODE & INSTRUKSI PEMBAYARAN */}
+        <div className="bg-white border border-slate-200 shadow-sm rounded-[3rem] p-8 md:p-10 flex flex-col items-center text-center">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Scan QRIS di bawah ini untuk membayar</p>
           <img 
             src={qrCodeImage} 
             alt="QR Code balaskan.id" 
-            className="w-full max-w-sm h-auto object-contain rounded-3xl shadow-2xl bg-white p-2"
+            className="w-full max-w-sm h-auto object-contain rounded-3xl shadow-md bg-white p-2 mb-8 border border-slate-100"
           />
+
+          {/* KARTU INSTRUKSI TATA CARA BAYAR */}
+          <div className="w-full bg-slate-50 border border-slate-100 rounded-3xl p-6 text-left">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="bg-blue-100 p-2 rounded-xl text-blue-600">
+                <HelpCircle size={18} />
+              </div>
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">Tata Cara Pembayaran QRIS</h4>
+            </div>
+
+            <ol className="space-y-3 text-xs text-slate-600 font-medium list-decimal list-inside">
+              <li className="leading-relaxed">
+                Buka aplikasi Mobile Banking atau Dompet Digital (E-Wallet) Anda seperti <span className="font-bold text-slate-800">BCA, GoPay, OVO, Dana, ShopeePay, Mandiri, dll</span>.
+              </li>
+              <li className="leading-relaxed">
+                Pilih menu <span className="font-bold text-slate-800">Scan / QRIS</span> pada aplikasi pembayaran Anda.
+              </li>
+              <li className="leading-relaxed">
+                Arahkan kamera ke gambar QR Code di atas atau pilih <span className="font-bold text-slate-800">Upload dari Galeri</span> (jika Anda men-screenshot atau mendownload QR code ini).
+              </li>
+              <li className="leading-relaxed">
+                Pastikan nominal pembayaran sesuai dengan total tagihan (<span className="font-bold text-blue-600">Rp {total ? total.toLocaleString('id-ID') : 0}</span>).
+              </li>
+              <li className="leading-relaxed">
+                Selesaikan transaksi dan <span className="font-bold text-slate-800">screenshot/simpan bukti pembayaran</span> untuk di-upload pada form di bawah.
+              </li>
+            </ol>
+          </div>
         </div>
 
         {/* UPLOAD AREA */}

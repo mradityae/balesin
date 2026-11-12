@@ -106,9 +106,7 @@ export default function Dashboard() {
     const token = getToken();
     if (!token) { nav("/login"); return; }
     try {
-      const decoded = jwtDecode(token);
-      console.log("decoded token: ", decoded);
-      
+      const decoded = jwtDecode(token);      
       const userId = decoded.uid || decoded.id;
       const roleVal = decoded.role || "";
       setUserRole(roleVal);

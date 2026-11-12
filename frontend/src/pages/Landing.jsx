@@ -9,7 +9,6 @@ import api from "../services/api";
 export default function Landing() {
   const [pricing, setPricing] = useState({
     pricePerDay: 2000,
-    priceMonthly: 60000,
     oldPrice: "250k",
     activePromoText: "Otomatis Whitelist WA"
   });
@@ -34,7 +33,6 @@ export default function Landing() {
         if (res?.data) {
           setPricing({
             pricePerDay: res.data.pricePerDay || 2000,
-            priceMonthly: res.data.priceMonthly || 60000,
             oldPrice: res.data.oldPrice || "250k",
             activePromoText: res.data.activePromoText || "Otomatis Whitelist WA"
           });
@@ -43,6 +41,9 @@ export default function Landing() {
       .catch(() => {})
       .finally(() => setLoadingPricing(false));
   }, []);
+
+  // Perhitungan otomatis harga bulanan (per hari dikalikan 30)
+  const calculatedMonthlyPrice = Number(pricing.pricePerDay) * 30;
 
   return (
     <div className="bg-[#020617] text-slate-200 font-sans selection:bg-emerald-500/30 min-h-screen">
@@ -153,19 +154,19 @@ export default function Landing() {
               </div>
             ) : (
               <>
-                <div className="mb-8 p-6 bg-white/5 rounded-2xl border border-white/10 flex items-baseline justify-between">
+                <div className="mb-8 p-6 bg-white/5 rounded-2xl border border-white/10 flex flex-col sm:flex-row items-start sm:items-baseline justify-between gap-4">
                   <div>
-                    <span className="text-sm text-slate-500 line-through font-bold block">Rp {pricing.oldPrice} / bln</span>
-                    <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-xs text-slate-400 uppercase font-bold tracking-wider block mb-1">Harga Per Hari</span>
+                    <div className="flex items-baseline gap-1">
                       <span className="text-4xl md:text-5xl font-black text-emerald-400">
-                        Rp {Number(pricing.priceMonthly).toLocaleString('id-ID')}
+                        Rp {Number(pricing.pricePerDay).toLocaleString('id-ID')}
                       </span>
-                      <span className="text-slate-400 text-xs font-bold"> / bulan</span>
+                      <span className="text-slate-400 text-xs font-bold"> / hari</span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-full uppercase tracking-wider">
-                      ~Rp {Number(pricing.pricePerDay).toLocaleString('id-ID')} / hari
+                  <div className="sm:text-right">
+                    <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-full uppercase tracking-wider inline-block">
+                      Total per bulan (x 30 hari): Rp {calculatedMonthlyPrice.toLocaleString('id-ID')}
                     </span>
                   </div>
                 </div>
